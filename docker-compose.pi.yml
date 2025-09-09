@@ -7,8 +7,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile.arm64  # ARM-specific Dockerfile
     container_name: minhmom-backend
-    ports:
-      - "8000:8000"
     volumes:
       - /home/minhbq/minhmom/images:/app/images
       - ./backend/config.prod.yaml:/app/config.yaml
@@ -30,8 +28,6 @@ services:
       context: ./mm-frontend
       dockerfile: Dockerfile.arm64  # ARM-specific Dockerfile
     container_name: minhmom-frontend
-    ports:
-      - "80:80"
     environment:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
       - VITE_GROUP_ID=${VITE_GROUP_ID:-2847737995453663}
