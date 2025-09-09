@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import uuid
 from datetime import datetime, timezone
 
@@ -53,6 +53,36 @@ def to_local_time(dt: datetime | str | None) -> str | None:
 
 
 # ---------- pricing (same logic you already use) ----------
+
+
+def _tokenize(s: str) -> List[str]:
+    """Tokenize a string for matching (similar to process_updated_post_comments.py)"""
+    import re
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9áàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữự\s-]", " ", s)
+    return [t for t in s.split() if t]
+
+
+def pick_item_for_comment(items: List[Dict[str, Any]], comment_type: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Pick the best item based on type matching (similar to process_updated_post_comments.py)"""
+    if not items:
+        return None
+    if len(items) == 1:
+        return items[0]
+    if not comment_type:
+        return items[0]
+
+    ctoks = set(_tokenize(comment_type))
+    best = None
+    best_score = -1
+    for it in items:
+        it_type = (it.get("type") or "") if isinstance(it, dict) else ""
+        it_toks = set(_tokenize(it_type))
+        score = len(ctoks & it_toks)
+        if score > best_score:
+            best_score = score
+            best = it
+    return best or items[0]
 
 
 def compute_min_cost(prices: List[Dict[str, Any]], qty: int) -> Dict[str, Any]:

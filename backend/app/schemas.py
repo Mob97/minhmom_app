@@ -71,6 +71,13 @@ class StatusIn(BaseModel):
     view_order: Optional[int] = None
 
 
+class StatusPatch(BaseModel):
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    view_order: Optional[int] = None
+
+
 class StatusOut(StatusIn):
     id: str
     model_config = ConfigDict(from_attributes=True)
@@ -99,6 +106,15 @@ class OrderUserOut(BaseModel):
     address: Optional[str] = None
     phone_number: Optional[str] = None
     avatar_url: Optional[str] = None
+    addresses: Optional[List[str]] = None  # All addresses for selection
+
+
+class UpdateCustomerRequest(BaseModel):
+    """Request model for updating customer information"""
+    name: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    addresses: Optional[List[str]] = None
 
 
 class UserIn(BaseModel):
@@ -165,6 +181,7 @@ class OrderIn(BaseModel):
 
     status_code: str = "NEW"
     note: Optional[str] = None
+    user: Optional[OrderUserOut] = None
 
 
 class OrderOut(BaseModel):
@@ -175,6 +192,7 @@ class OrderOut(BaseModel):
     comment_created_time: Optional[str] = None
 
     url: str
+    raw_url: Optional[str] = None
     qty: float
     type: Optional[str] = None
     currency: str
@@ -185,7 +203,9 @@ class OrderOut(BaseModel):
     status_code: str
     status_history: List[dict] = Field(default_factory=list)
     parsed_at: Optional[str] = None
+    source: Optional[str] = None
     user: Optional[OrderUserOut] = None
+    address: Optional[str] = None
     note: Optional[str] = None
 
 

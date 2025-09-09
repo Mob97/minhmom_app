@@ -11,6 +11,7 @@ import type {
   UpdatePostRequest,
   Order,
   CreateOrderRequest,
+  UpdateOrderRequest,
   UpdateOrderStatusRequest,
   StatusQueryParams,
   UserQueryParams,
@@ -20,7 +21,8 @@ import type {
   AuthUser,
   LoginRequest,
   RegisterRequest,
-  AuthResponse
+  AuthResponse,
+  OrderUser
 } from '@/types/api';
 
 import { getAppConfig } from '@/config/app-config';
@@ -141,6 +143,18 @@ export const userApi = {
     return response.data;
   },
 
+  search: async (q: string, limit: number = 10): Promise<OrderUser[]> => {
+    const response: AxiosResponse<OrderUser[]> = await apiClient.get('/users/search/', {
+      params: { q, limit }
+    });
+    return response.data;
+  },
+
+  updateCustomer: async (uid: string, data: { name?: string; phone_number?: string; address?: string; addresses?: string[] }): Promise<User> => {
+    const response: AxiosResponse<User> = await apiClient.patch(`/users/${uid}/update/`, data);
+    return response.data;
+  },
+
   create: async (data: CreateUserRequest): Promise<User> => {
     const response: AxiosResponse<User> = await apiClient.post('/users', data);
     return response.data;
@@ -219,6 +233,19 @@ export const orderApi = {
     return response.data;
   },
 
+  update: async (
+    groupId: string,
+    postId: string,
+    orderId: string,
+    data: UpdateOrderRequest
+  ): Promise<Order> => {
+    const response: AxiosResponse<Order> = await apiClient.patch(
+      `/groups/${groupId}/posts/${postId}/orders/${orderId}`,
+      data
+    );
+    return response.data;
+  },
+
   updateStatus: async (
     groupId: string,
     postId: string,
@@ -268,6 +295,10 @@ export const orderApi = {
       doneOrders: number;
     }> = await apiClient.get(`/dashboard/groups/${groupId}`);
     return response.data;
+  },
+
+  delete: async (groupId: string, postId: string, orderId: string): Promise<void> => {
+    await apiClient.delete(`/groups/${groupId}/posts/${postId}/orders/${orderId}`);
   },
 };
 

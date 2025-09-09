@@ -7,13 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, Plus, ExternalLink, Eye, Edit2 } from 'lucide-react';
+import { RefreshCw, Plus, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 import { CreateOrderModal } from './CreateOrderModal';
+import { EditOrderModal } from './EditOrderModal';
+import { DeleteOrderDialog } from './DeleteOrderDialog';
 import { useToast } from '@/hooks/use-toast';
-import { useUpdateOrderStatus } from '@/hooks/use-api';
+import { useUpdateOrderStatus, useUpdateOrder, useCreateOrder, useDeleteOrder } from '@/hooks/use-api';
 import { ImageGallery } from '@/components/ui/image-gallery';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
+import type { Order } from '@/types/api';
 
 export const OrdersDrawer: React.FC = () => {
   const {
@@ -39,12 +42,19 @@ export const OrdersDrawer: React.FC = () => {
 
   const { data: statuses } = useStatuses({ active: true });
   const updateOrderStatusMutation = useUpdateOrderStatus();
+  const updateOrderMutation = useUpdateOrder();
+  const createOrderMutation = useCreateOrder();
+  const deleteOrderMutation = useDeleteOrder();
   const updatePostMutation = useUpdatePost();
   const { toast } = useToast();
   const { isAdmin } = useAuth();
 
   const [isEditingImportPrice, setIsEditingImportPrice] = useState(false);
   const [importPriceValue, setImportPriceValue] = useState('');
+  const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isDeleteOrderDialogOpen, setIsDeleteOrderDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
 
   const filteredOrders = orders?.filter(order =>
     !ordersStatusFilter || ordersStatusFilter === "all" || order.status_code === ordersStatusFilter
@@ -149,6 +159,88 @@ export const OrdersDrawer: React.FC = () => {
 
   const handleCreateOrder = () => {
     setCreateOrderModalOpen(true);
+  };
+
+  const handleCreateOrderSubmit = async (data: any) => {
+    if (!selectedGroupId || !selectedPostId) return;
+
+    try {
+      await createOrderMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: selectedPostId,
+        data
+      });
+      toast({
+        title: 'Success',
+        description: 'Order created successfully',
+      });
+      setCreateOrderModalOpen(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.detail || 'Failed to create order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleEditOrder = (order: Order) => {
+    setSelectedOrder(order);
+    setIsEditOrderModalOpen(true);
+  };
+
+  const handleUpdateOrder = async (data: any) => {
+    if (!selectedGroupId || !selectedPostId || !selectedOrder) return;
+
+    try {
+      await updateOrderMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: selectedPostId,
+        orderId: selectedOrder.order_id || selectedOrder.comment_id || '',
+        data
+      });
+      toast({
+        title: 'Success',
+        description: 'Order updated successfully',
+      });
+      setIsEditOrderModalOpen(false);
+      setSelectedOrder(null);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.detail || 'Failed to update order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteOrder = (order: Order) => {
+    setOrderToDelete(order);
+    setIsDeleteOrderDialogOpen(true);
+  };
+
+  const handleConfirmDeleteOrder = async (orderId: string) => {
+    if (!selectedGroupId || !selectedPostId) return;
+
+    try {
+      await deleteOrderMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: selectedPostId,
+        orderId
+      });
+      toast({
+        title: 'Success',
+        description: 'Order deleted successfully',
+      });
+      setIsDeleteOrderDialogOpen(false);
+      setOrderToDelete(null);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.detail || 'Failed to delete order',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (!selectedPostId) {
@@ -346,35 +438,18 @@ export const OrdersDrawer: React.FC = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{t.posts.commentId}</TableHead>
                       <TableHead>{t.common.user}</TableHead>
                       <TableHead>{t.common.quantity}</TableHead>
                       <TableHead>{t.common.type}</TableHead>
                       <TableHead>{t.common.total}</TableHead>
                       <TableHead>{t.common.status}</TableHead>
                       <TableHead>Ghi chú</TableHead>
-                      <TableHead className="text-right">{t.common.actions}</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredOrders.map((order) => (
                       <TableRow key={order.order_id || order.comment_id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="outline">
-                              {order.order_id || order.comment_id}
-                            </Badge>
-                            {order.comment_url && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => window.open(order.comment_url, '_blank')}
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <Button
@@ -434,9 +509,23 @@ export const OrdersDrawer: React.FC = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center justify-end space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditOrder(order)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteOrder(order)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -451,7 +540,24 @@ export const OrdersDrawer: React.FC = () => {
       <CreateOrderModal
         open={isCreateOrderModalOpen}
         onOpenChange={setCreateOrderModalOpen}
-        onSubmit={() => {}}
+        onSubmit={handleCreateOrderSubmit}
+        loading={createOrderMutation.isPending}
+      />
+
+      <EditOrderModal
+        open={isEditOrderModalOpen}
+        onOpenChange={setIsEditOrderModalOpen}
+        onSubmit={handleUpdateOrder}
+        order={selectedOrder}
+        loading={updateOrderMutation.isPending}
+      />
+
+      <DeleteOrderDialog
+        open={isDeleteOrderDialogOpen}
+        onOpenChange={setIsDeleteOrderDialogOpen}
+        order={orderToDelete}
+        onConfirm={handleConfirmDeleteOrder}
+        loading={deleteOrderMutation.isPending}
       />
     </>
   );

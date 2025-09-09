@@ -84,7 +84,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t.users.createUser}</DialogTitle>
           <DialogDescription>
@@ -92,29 +92,39 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-3 py-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">{t.users.name} *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="VD: Nguyễn Văn A"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone_number">{t.users.phoneNumber}</Label>
+                <Input
+                  id="phone_number"
+                  value={formData.phone_number}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone_number: e.target.value })}
+                  placeholder="VD: 0123456789"
+                />
+              </div>
+            </div>
             <div className="grid gap-2">
-              <Label htmlFor="fb_uid">{t.users.fbUid}</Label>
+              <Label htmlFor="fb_uid">{t.users.fbUid} (Tùy chọn)</Label>
               <Input
                 id="fb_uid"
                 value={formData.fb_uid}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, fb_uid: e.target.value })}
                 placeholder="VD: 100011746878218"
-                required
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="name">{t.users.name}</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="VD: Nguyễn Văn A"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="fb_username">{t.users.fbUsername}</Label>
+              <Label htmlFor="fb_username">{t.users.fbUsername} (Tùy chọn)</Label>
               <Input
                 id="fb_username"
                 value={formData.fb_username}
@@ -123,7 +133,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="fb_url">{t.users.fbUrl}</Label>
+              <Label htmlFor="fb_url">{t.users.fbUrl} (Tùy chọn)</Label>
               <Input
                 id="fb_url"
                 type="url"
@@ -167,34 +177,27 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                 </Button>
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="phone_number">{t.users.phoneNumber}</Label>
-              <Input
-                id="phone_number"
-                value={formData.phone_number}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, phone_number: e.target.value })}
-                placeholder="VD: 0123456789"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="avatar_url">{t.users.avatarUrl}</Label>
-              <Input
-                id="avatar_url"
-                type="url"
-                value={formData.avatar_url}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, avatar_url: e.target.value })}
-                placeholder="https://example.com/avatar.jpg"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notes">{t.users.notes}</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Ghi chú về người dùng này..."
-                rows={3}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="avatar_url">{t.users.avatarUrl}</Label>
+                <Input
+                  id="avatar_url"
+                  type="url"
+                  value={formData.avatar_url}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, avatar_url: e.target.value })}
+                  placeholder="https://example.com/avatar.jpg"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="notes">{t.users.notes}</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Ghi chú về người dùng này..."
+                  rows={2}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

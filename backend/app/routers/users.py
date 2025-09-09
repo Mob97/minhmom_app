@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List
 from ..db import get_db, customers_col, posts_col
-from ..schemas import UserIn, UserFull, PaginatedResponse
+from ..schemas import UserIn, UserFull, PaginatedResponse, OrderUserOut, UpdateCustomerRequest
 from ..utils import str_object_id, to_local_time
 from ..auth import require_user_or_admin, require_admin
 import math
@@ -434,3 +435,111 @@ async def get_user_orders_with_stats(
     }
 
     return user_response
+
+
+@router.get("/search/", response_model=List[OrderUserOut])
+async def search_customers(
+    q: str = Query(..., description="Search query for customer name"),
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of results"),
+    current_user: dict = Depends(require_user_or_admin()),
+    db=Depends(get_db)
+):
+    """Search customers by name and return top results for dropdown selection"""
+    if not q or len(q.strip()) < 2:
+        return []
+
+    # Search by name (case insensitive)
+    query = {"name": {"$regex": q.strip(), "$options": "i"}}
+
+    # Get customers sorted by name
+    customers = await customers_col(db).find(query).sort("name", 1).limit(limit).to_list(length=limit)
+
+    # Convert to OrderUserOut format
+    results = []
+    for customer in customers:
+        # Extract address from addresses array or use address field
+        address = ""
+        addresses = []
+        if customer.get("addresses") and len(customer.get("addresses", [])) > 0:
+            addresses = customer["addresses"]
+            address = addresses[0]  # Use first address as primary
+        elif customer.get("address"):
+            address = customer["address"]
+            addresses = [customer["address"]]
+
+        results.append(OrderUserOut(
+            fb_uid=customer.get("fb_uid"),
+            fb_username=customer.get("fb_username"),
+            name=customer.get("name"),
+            fb_url=customer.get("fb_url"),
+            address=address,
+            phone_number=customer.get("phone_number"),
+            avatar_url=customer.get("avatar_url"),
+            addresses=addresses  # Include all addresses
+        ))
+
+    return results
+
+
+@router.patch("/{uid}/update/", response_model=UserFull)
+async def update_customer(
+    uid: str,
+    data: UpdateCustomerRequest,
+    current_user: dict = Depends(require_user_or_admin()),
+    db=Depends(get_db)
+):
+    """Update customer information including addresses and phone number"""
+    # Validate that the customer exists
+    customer = await customers_col(db).find_one({"fb_uid": uid})
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Prepare update data
+    update_data = {}
+
+    if data.name is not None:
+        update_data["name"] = data.name
+    if data.phone_number is not None:
+        update_data["phone_number"] = data.phone_number
+    if data.addresses is not None:
+        update_data["addresses"] = data.addresses
+    if data.address is not None:
+        # If updating single address, add it to addresses array if not already present
+        new_address = data.address
+        current_addresses = customer.get("addresses", [])
+        if new_address not in current_addresses:
+            current_addresses.append(new_address)
+            update_data["addresses"] = current_addresses
+        update_data["address"] = new_address
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    # Update the customer
+    result = await customers_col(db).update_one(
+        {"fb_uid": uid},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="No changes made")
+
+    # Return updated customer
+    updated_customer = await customers_col(db).find_one({"fb_uid": uid})
+    if not updated_customer:
+        raise HTTPException(status_code=404, detail="Customer not found after update")
+
+    # Convert to UserFull format
+    return UserFull(
+        id=str_object_id(updated_customer.get("_id")),
+        fb_uid=updated_customer.get("fb_uid"),
+        fb_username=updated_customer.get("fb_username"),
+        name=updated_customer.get("name"),
+        fb_url=updated_customer.get("fb_url"),
+        addresses=updated_customer.get("addresses", []),
+        phone_number=updated_customer.get("phone_number"),
+        avatar_url=updated_customer.get("avatar_url"),
+        notes=updated_customer.get("note"),
+        is_active=updated_customer.get("is_active", True),
+        created_date=format_created_date(updated_customer.get("created_date")) if updated_customer.get("created_date") else None
+    )

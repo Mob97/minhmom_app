@@ -19,7 +19,7 @@ export interface Status {
   display_name: string;
   description?: string;
   is_active: boolean;
-  view_order?: string;
+  view_order?: number;
 }
 
 export interface CreateStatusRequest {
@@ -27,14 +27,14 @@ export interface CreateStatusRequest {
   display_name: string;
   description?: string;
   is_active?: boolean;
-  view_order?: string;
+  view_order?: number;
 }
 
 export interface UpdateStatusRequest {
   display_name?: string;
   description?: string;
   is_active?: boolean;
-  view_order?: string;
+  view_order?: number;
 }
 
 // Authentication types
@@ -86,6 +86,7 @@ export interface OrderUser {
   address?: string;
   phone_number?: string;
   avatar_url?: string;
+  addresses?: string[]; // All addresses for selection
   // Legacy properties for backward compatibility
   username?: string;
   uid?: string;
@@ -223,6 +224,31 @@ export interface CreateOrderRequest {
   price_calc?: PriceCalculation;
   status_code?: string;
   note?: string;
+  user?: {
+    name?: string;
+    address?: string;
+    phone_number?: string;
+  };
+}
+
+export interface UpdateOrderRequest {
+  comment_id?: string;
+  comment_url?: string;
+  comment_text?: string;
+  comment_created_time?: string;
+  url?: string;
+  qty?: number;
+  type?: string;
+  currency?: string;
+  matched_item?: PostItem;
+  price_calc?: PriceCalculation;
+  status_code?: string;
+  note?: string;
+  user?: {
+    name?: string;
+    address?: string;
+    phone_number?: string;
+  };
 }
 
 export interface UpdateOrderStatusRequest {

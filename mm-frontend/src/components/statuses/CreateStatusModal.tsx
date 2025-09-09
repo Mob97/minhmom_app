@@ -30,7 +30,11 @@ export const CreateStatusModal: React.FC<CreateStatusModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    const submitData = {
+      ...formData,
+      view_order: formData.view_order ? parseInt(formData.view_order, 10) : undefined
+    };
+    onSubmit(submitData);
   };
 
   const handleOpenChange = (open: boolean) => {

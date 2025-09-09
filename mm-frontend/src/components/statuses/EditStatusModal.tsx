@@ -38,7 +38,7 @@ export const EditStatusModal: React.FC<EditStatusModalProps> = ({
         display_name: status.display_name,
         description: status.description || '',
         is_active: status.is_active,
-        view_order: status.view_order || '',
+        view_order: status.view_order ? status.view_order.toString() : '',
       });
     }
   }, [status]);
@@ -46,7 +46,11 @@ export const EditStatusModal: React.FC<EditStatusModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (statusCode) {
-      onSubmit(statusCode, formData);
+      const submitData = {
+        ...formData,
+        view_order: formData.view_order ? parseInt(formData.view_order, 10) : undefined
+      };
+      onSubmit(statusCode, submitData);
     }
   };
 

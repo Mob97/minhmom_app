@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-api';
 import { useAppStore } from '@/store/app-store';
 import { t } from '@/lib/i18n';
@@ -38,8 +38,28 @@ export const UsersScreen: React.FC = () => {
     direction: 'asc'
   });
 
+  // Local state for search input (immediate UI update)
+  const [searchInput, setSearchInput] = useState(usersSearchQuery || '');
+  // Debounced search query for API calls
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(usersSearchQuery || '');
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchInput);
+      setUsersSearchQuery(searchInput);
+    }, 2000); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchInput, setUsersSearchQuery]);
+
+  // Sync local input with global state when it changes externally
+  useEffect(() => {
+    setSearchInput(usersSearchQuery || '');
+  }, [usersSearchQuery]);
+
   const { data: usersResponse, isLoading, error, refetch } = useUsers({
-    q: usersSearchQuery || undefined,
+    q: debouncedSearchQuery || undefined,
     page: currentPage,
     page_size: pageSize,
     sort_by: sortConfig.field,
@@ -117,7 +137,7 @@ export const UsersScreen: React.FC = () => {
   };
 
   const handleSearchChange = (value: string) => {
-    setUsersSearchQuery(value);
+    setSearchInput(value);
     setCurrentPage(1); // Reset to first page when searching
   };
 
@@ -187,7 +207,7 @@ export const UsersScreen: React.FC = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={`${t.common.search} ${t.users.title.toLowerCase()}...`}
-            value={usersSearchQuery}
+            value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />

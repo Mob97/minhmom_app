@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from ..db import get_db, posts_col, statuses_col
 from ..schemas import PostPatch, PostOut, OrderIn, OrderOut, OrderStatusPatch, PaginatedResponse
 from ..auth import require_user_or_admin
-from ..utils import to_local_time
+from ..utils import to_local_time, pick_item_for_comment, compute_min_cost
 import hashlib
 import os
 import math
@@ -370,13 +370,33 @@ async def create_order(
         if dup:
             raise HTTPException(409, "Order with this comment_id already exists")
 
-    # 4) Build order_id using SHA-1 hash
+    # 4) Get post items for price calculation
+    items = post.get("items") or []
+    if not items:
+        raise HTTPException(400, "Post has no items for price calculation")
+
+    # 5) Pick the best item based on type
+    chosen_item = pick_item_for_comment(items, body.type)
+    if not chosen_item:
+        raise HTTPException(400, "No suitable item found for the given type")
+
+    # 6) Calculate price
+    price_info = compute_min_cost(chosen_item.get("prices") or [], int(body.qty))
+
+    # 7) Build order_id using SHA-1 hash with datetime for uniqueness
     user_uid = body.url.split("/")[-1] if body.url else ""
+    now_timestamp = datetime.now(timezone.utc).timestamp()
     order_id = hashlib.sha1(
-        f"{post_id}:{body.comment_id}:{user_uid}".encode("utf-8")
+        f"{post_id}:{body.comment_id}:{user_uid}:{now_timestamp}".encode("utf-8")
     ).hexdigest()
 
     now = datetime.now(timezone.utc).isoformat()
+
+    # 8) Extract user address for the order
+    user_address = ""
+    if body.user and body.user.address:
+        user_address = body.user.address
+
     order_doc = {
         "order_id": order_id,
         "comment_id": body.comment_id,
@@ -384,11 +404,15 @@ async def create_order(
         "comment_text": body.comment_text,
         "comment_created_time": body.comment_created_time,
         "url": body.url,
+        "raw_url": body.url,  # Keep original URL for traceability
         "qty": body.qty,
         "type": body.type,
         "currency": body.currency,
-        "matched_item": body.matched_item.model_dump() if body.matched_item else None,
-        "price_calc": body.price_calc.model_dump() if body.price_calc else None,
+        "matched_item": {
+            "name": chosen_item.get("name"),
+            "type": chosen_item.get("type"),
+        },
+        "price_calc": price_info,
         "status_code": body.status_code,
         "status_history": [{
             "status_code": body.status_code,
@@ -396,8 +420,10 @@ async def create_order(
             "at": now,
         }],
         "parsed_at": now,
+        "source": "manual",  # Mark as manually created
         "note": body.note,
-        # "user": None,
+        "user": body.user.model_dump() if body.user else None,
+        "address": user_address,  # Single address for shipping
     }
 
     await posts_col(db, group_id).update_one(
@@ -454,6 +480,130 @@ async def update_order_status(
     raise HTTPException(404, "Order not found after update")
 
 
+@router.patch("/{post_id}/orders/{order_id}", response_model=OrderOut)
+async def update_order(
+    group_id: str,
+    post_id: str,
+    order_id: str,
+    body: OrderIn,
+    current_user: dict = Depends(require_user_or_admin()),
+    db=Depends(get_db)
+):
+    # Validate status_code if provided
+    if body.status_code:
+        st = await statuses_col(db).find_one({"status_code": body.status_code})
+        if not st:
+            raise HTTPException(400, f"Unknown status_code: {body.status_code}")
+
+    # Ensure the post exists
+    post = await posts_col(db, group_id).find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(404, "Post not found")
+
+    # Check if order exists
+    existing_order = None
+    for order in post.get("orders", []):
+        if order.get("order_id") == order_id:
+            existing_order = order
+            break
+
+    if not existing_order:
+        raise HTTPException(404, "Order not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Get post items for price recalculation if needed
+    items = post.get("items") or []
+
+    # Build update data
+    update_data = {}
+    if body.comment_id is not None:
+        update_data["orders.$[o].comment_id"] = body.comment_id
+    if body.comment_url is not None:
+        update_data["orders.$[o].comment_url"] = body.comment_url
+    if body.comment_text is not None:
+        update_data["orders.$[o].comment_text"] = body.comment_text
+    if body.comment_created_time is not None:
+        update_data["orders.$[o].comment_created_time"] = body.comment_created_time
+    if body.url is not None:
+        update_data["orders.$[o].url"] = body.url
+        update_data["orders.$[o].raw_url"] = body.url  # Update raw_url too
+    if body.qty is not None:
+        update_data["orders.$[o].qty"] = body.qty
+    if body.type is not None:
+        update_data["orders.$[o].type"] = body.type
+    if body.currency is not None:
+        update_data["orders.$[o].currency"] = body.currency
+    if body.matched_item is not None:
+        update_data["orders.$[o].matched_item"] = body.matched_item.model_dump()
+    if body.price_calc is not None:
+        update_data["orders.$[o].price_calc"] = body.price_calc.model_dump()
+    if body.status_code is not None:
+        update_data["orders.$[o].status_code"] = body.status_code
+        # Add status history entry
+        update_data["$push"] = {
+            "orders.$[o].status_history": {
+                "status_code": body.status_code,
+                "note": "updated",
+                "at": now,
+            }
+        }
+    if body.note is not None:
+        update_data["orders.$[o].note"] = body.note
+    if body.user is not None:
+        update_data["orders.$[o].user"] = body.user.model_dump()
+        # Update address field when user is updated
+        user_address = ""
+        if body.user.address:
+            user_address = body.user.address
+        update_data["orders.$[o].address"] = user_address
+
+    # Recalculate price if qty or type changed
+    if (body.qty is not None or body.type is not None) and items:
+        # Get current order to determine what to recalculate
+        current_qty = existing_order.get("qty", body.qty or 1)
+        current_type = existing_order.get("type", body.type)
+
+        # Use updated values
+        new_qty = body.qty if body.qty is not None else current_qty
+        new_type = body.type if body.type is not None else current_type
+
+        # Pick item and calculate price
+        chosen_item = pick_item_for_comment(items, new_type)
+        if chosen_item:
+            price_info = compute_min_cost(chosen_item.get("prices") or [], int(new_qty))
+            update_data["orders.$[o].matched_item"] = {
+                "name": chosen_item.get("name"),
+                "type": chosen_item.get("type"),
+            }
+            update_data["orders.$[o].price_calc"] = price_info
+
+    # Update the order
+    res = await posts_col(db, group_id).update_one(
+        {"_id": post_id, "orders.order_id": order_id},
+        {
+            "$set": update_data,
+            "$setOnInsert": {},
+        },
+        array_filters=[{"o.order_id": order_id}],
+        upsert=False,
+    )
+
+    if res.matched_count == 0:
+        raise HTTPException(404, "Order not found")
+
+    # Return the updated order
+    d = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
+    for o in d.get("orders") or []:
+        if o.get("order_id") == order_id:
+            # Convert parsed_at to local time string
+            o["parsed_at"] = to_local_time(o.get("parsed_at"))
+            # Convert comment_created_time to local time string
+            o["comment_created_time"] = to_local_time(o.get("comment_created_time"))
+            return OrderOut(**o)
+    raise HTTPException(404, "Order not found after update")
+
+
 @router.get("/orders/by-user/{uid}", response_model=List[OrderOut])
 async def get_orders_by_user(
     group_id: str,
@@ -486,3 +636,41 @@ async def get_orders_by_user(
                 all_orders.append(OrderOut(**order))
 
     return all_orders
+
+
+@router.delete("/{post_id}/orders/{order_id}")
+async def delete_order(
+    group_id: str,
+    post_id: str,
+    order_id: str,
+    current_user: dict = Depends(require_user_or_admin()),
+    db=Depends(get_db)
+):
+    """
+    Delete an order from a post.
+    """
+    # Check if the post exists
+    post = await posts_col(db, group_id).find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(404, "Post not found")
+
+    # Check if the order exists
+    order_exists = False
+    for order in post.get("orders", []):
+        if order.get("order_id") == order_id:
+            order_exists = True
+            break
+
+    if not order_exists:
+        raise HTTPException(404, "Order not found")
+
+    # Remove the order from the post
+    result = await posts_col(db, group_id).update_one(
+        {"_id": post_id},
+        {"$pull": {"orders": {"order_id": order_id}}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(404, "Order not found or could not be deleted")
+
+    return {"message": "Order deleted successfully"}

@@ -10,10 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Pagination } from '@/components/ui/pagination';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAppStore } from '@/store/app-store';
-import { useUserOrdersWithStats, useStatuses, useUpdateOrderStatus } from '@/hooks/use-api';
-import { X, ExternalLink, Printer, Save } from 'lucide-react';
+import { useUserOrdersWithStats, useStatuses, useUpdateOrderStatus, useUpdateOrder, useDeleteOrder } from '@/hooks/use-api';
+import { X, ExternalLink, Printer, Save, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { EditOrderModal } from './EditOrderModal';
+import { DeleteOrderDialog } from './DeleteOrderDialog';
 import type { Order } from '@/types/api';
 
 interface UserOrdersDrawerProps {
@@ -36,6 +38,10 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
   const [newStatusCode, setNewStatusCode] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50; // Fixed page size for now
+  const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isDeleteOrderDialogOpen, setIsDeleteOrderDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
 
   const { selectedGroupId } = useAppStore();
 
@@ -63,6 +69,8 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
 
   // Mutation for updating order status
   const updateOrderStatusMutation = useUpdateOrderStatus();
+  const updateOrderMutation = useUpdateOrder();
+  const deleteOrderMutation = useDeleteOrder();
   const { toast } = useToast();
 
   const isAdmin = user?.role === 'admin';
@@ -434,6 +442,97 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
     }
   };
 
+  const handleEditOrder = (order: Order) => {
+    setSelectedOrder(order);
+    setIsEditOrderModalOpen(true);
+  };
+
+  const handleUpdateOrder = async (data: any) => {
+    if (!selectedGroupId || !selectedOrder) return;
+
+    // Find the orderData to get the post_id
+    const orderData = filteredOrders.find((orderData: { order: Order; post_id: string; post_description: string }) =>
+      orderData.order?.order_id === selectedOrder.order_id
+    );
+
+    if (!orderData) {
+      toast({
+        title: 'Lỗi cập nhật đơn hàng',
+        description: 'Không tìm thấy thông tin đơn hàng',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await updateOrderMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: orderData.post_id,
+        orderId: selectedOrder.order_id || selectedOrder.comment_id || '',
+        data
+      });
+      toast({
+        title: 'Thành công',
+        description: 'Đơn hàng đã được cập nhật thành công',
+      });
+      setIsEditOrderModalOpen(false);
+      setSelectedOrder(null);
+      // Refetch data to update the UI
+      refetchUserOrders();
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi',
+        description: error.detail || 'Không thể cập nhật đơn hàng',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteOrder = (order: Order) => {
+    setOrderToDelete(order);
+    setIsDeleteOrderDialogOpen(true);
+  };
+
+  const handleConfirmDeleteOrder = async (orderId: string) => {
+    if (!selectedGroupId || !orderToDelete) return;
+
+    // Find the orderData to get the post_id
+    const orderData = filteredOrders.find((orderData: { order: Order; post_id: string; post_description: string }) =>
+      orderData.order?.order_id === orderToDelete.order_id
+    );
+
+    if (!orderData) {
+      toast({
+        title: 'Lỗi xóa đơn hàng',
+        description: 'Không tìm thấy thông tin đơn hàng',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await deleteOrderMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: orderData.post_id,
+        orderId
+      });
+      toast({
+        title: 'Thành công',
+        description: 'Đơn hàng đã được xóa thành công',
+      });
+      setIsDeleteOrderDialogOpen(false);
+      setOrderToDelete(null);
+      // Refetch data to update the UI
+      refetchUserOrders();
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi',
+        description: error.detail || 'Không thể xóa đơn hàng',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (!userData) {
     return null;
   }
@@ -604,6 +703,7 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Ghi chú</TableHead>
                       <TableHead>Thời gian</TableHead>
+                      <TableHead className="text-right">Thao tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -697,6 +797,27 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                           <TableCell>
                             {formatDateTime(order?.comment_created_time)}
                           </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end space-x-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditOrder(order)}
+                                disabled={updateOrderMutation.isPending}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteOrder(order)}
+                                className="text-destructive hover:text-destructive"
+                                disabled={deleteOrderMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -749,6 +870,22 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditOrderModal
+        open={isEditOrderModalOpen}
+        onOpenChange={setIsEditOrderModalOpen}
+        onSubmit={handleUpdateOrder}
+        order={selectedOrder}
+        loading={updateOrderMutation.isPending}
+      />
+
+      <DeleteOrderDialog
+        open={isDeleteOrderDialogOpen}
+        onOpenChange={setIsDeleteOrderDialogOpen}
+        order={orderToDelete}
+        onConfirm={handleConfirmDeleteOrder}
+        loading={deleteOrderMutation.isPending}
+      />
     </Drawer>
   );
 };

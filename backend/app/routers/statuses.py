@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List
 from ..db import get_db, statuses_col
-from ..schemas import StatusIn, StatusOut
+from ..schemas import StatusIn, StatusOut, StatusPatch
 from ..utils import str_object_id
 from ..auth import require_user_or_admin, require_admin
 
@@ -85,11 +85,16 @@ async def create_status(
 @router.patch("/{status_code}", response_model=StatusOut)
 async def update_status(
     status_code: str,
-    body: StatusIn,
+    body: StatusPatch,
     current_user: dict = Depends(require_admin()),
     db=Depends(get_db)
 ):
-    await statuses_col(db).update_one({"status_code": status_code}, {"$set": body.model_dump()})
+    # Only update fields that are provided (not None)
+    update_data = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+
+    if not update_data:
+        raise HTTPException(400, "No fields to update")
+    await statuses_col(db).update_one({"status_code": status_code}, {"$set": update_data})
     d = await statuses_col(db).find_one({"status_code": status_code})
     if not d:
         raise HTTPException(404, "Status not found after update")

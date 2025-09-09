@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { usePosts } from '@/hooks/use-api';
 import { t } from '@/lib/i18n';
@@ -28,8 +28,28 @@ export const PostsScreen: React.FC = () => {
     direction: 'desc'
   });
 
+  // Local state for search input (immediate UI update)
+  const [searchInput, setSearchInput] = useState(postsSearchQuery || '');
+  // Debounced search query for API calls
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(postsSearchQuery || '');
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchInput);
+      setPostsSearchQuery(searchInput);
+    }, 2000); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchInput, setPostsSearchQuery]);
+
+  // Sync local input with global state when it changes externally
+  useEffect(() => {
+    setSearchInput(postsSearchQuery || '');
+  }, [postsSearchQuery]);
+
   const { data: postsResponse, isLoading, error, refetch } = usePosts(selectedGroupId, {
-    q: postsSearchQuery || undefined,
+    q: debouncedSearchQuery || undefined,
     page: currentPage,
     page_size: pageSize,
     sort_by: sortConfig.field,
@@ -50,7 +70,7 @@ export const PostsScreen: React.FC = () => {
   };
 
   const handleSearchChange = (value: string) => {
-    setPostsSearchQuery(value);
+    setSearchInput(value);
     setCurrentPage(1); // Reset to first page when searching
   };
 
@@ -135,7 +155,7 @@ export const PostsScreen: React.FC = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={`${t.common.search} ${t.common.post.toLowerCase()}...`}
-            value={postsSearchQuery}
+            value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />

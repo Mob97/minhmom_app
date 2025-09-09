@@ -7,6 +7,7 @@ import type {
   UpdateUserRequest,
   UpdatePostRequest,
   CreateOrderRequest,
+  UpdateOrderRequest,
   UpdateOrderStatusRequest,
   StatusQueryParams,
   UserQueryParams,
@@ -205,6 +206,31 @@ export const useCreateOrder = () => {
   });
 };
 
+export const useUpdateOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      groupId,
+      postId,
+      orderId,
+      data
+    }: {
+      groupId: string;
+      postId: string;
+      orderId: string;
+      data: UpdateOrderRequest
+    }) => orderApi.update(groupId, postId, orderId, data),
+    onSuccess: (_, { groupId, postId }) => {
+      // Invalidate both the specific post's orders and all orders queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders(groupId, postId) });
+      queryClient.invalidateQueries({ queryKey: ['all-orders', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['user-orders-with-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['users-with-orders'] });
+    },
+  });
+};
+
 export const useUpdateOrderStatus = () => {
   const queryClient = useQueryClient();
 
@@ -244,5 +270,41 @@ export const useDashboardData = (groupId: string) => {
     queryKey: ['dashboard', groupId],
     queryFn: () => orderApi.getDashboardData(groupId),
     enabled: !!groupId,
+  });
+};
+
+export const useCustomers = (q: string, limit: number = 10) => {
+  return useQuery({
+    queryKey: ['customers', 'search', q, limit],
+    queryFn: () => userApi.search(q, limit),
+    enabled: !!q && q.length >= 2,
+    staleTime: 30000, // 30 seconds
+  });
+};
+
+export const useUpdateCustomer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uid, data }: { uid: string; data: { name?: string; phone_number?: string; address?: string; addresses?: string[] } }) =>
+      userApi.updateCustomer(uid, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+  });
+};
+
+export const useDeleteOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ groupId, postId, orderId }: { groupId: string; postId: string; orderId: string }) =>
+      orderApi.delete(groupId, postId, orderId),
+    onSuccess: (_, { groupId, postId }) => {
+      // Invalidate both the specific post's orders and all orders queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders(groupId, postId) });
+      queryClient.invalidateQueries({ queryKey: ['all-orders', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['user-orders-with-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['users-with-orders'] });
+    },
   });
 };
