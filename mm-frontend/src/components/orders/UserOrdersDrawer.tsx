@@ -33,8 +33,6 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
   const [showAllOrdersLocal, setShowAllOrdersLocal] = useState(showAllOrders);
   const [showStatusUpdateDialog, setShowStatusUpdateDialog] = useState(false);
   const [ordersToUpdate, setOrdersToUpdate] = useState<Array<{ orderId: string; postId: string }>>([]);
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
-  const [newStatusCode, setNewStatusCode] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50; // Fixed page size for now
   const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
@@ -80,21 +78,6 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
     return status?.display_name || statusCode;
   };
 
-  // Helper function to get status color
-  const getStatusColor = (statusCode: string) => {
-    switch (statusCode) {
-      case 'DONE':
-        return 'bg-green-100 text-green-800';
-      case 'CANCELLED':
-        return 'bg-red-100 text-red-800';
-      case 'PENDING':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'PROCESSING':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   // Filter orders based on local showAllOrders state
   const filteredOrders = userData?.orders?.filter((orderData: { order: Order; post_id: string; post_description: string }) => {
@@ -435,73 +418,8 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
     }
   };
 
-  const handleStartEdit = (order: Order) => {
-    setEditingOrderId(order.order_id);
-    setNewStatusCode(order.status_code);
-  };
 
-  const handleCancelEdit = () => {
-    setEditingOrderId(null);
-    setNewStatusCode('');
-  };
 
-  const handleUpdateStatus = async (order: Order) => {
-    if (!newStatusCode || newStatusCode === order.status_code) {
-      handleCancelEdit();
-      return;
-    }
-
-    if (!selectedGroupId) {
-      toast({
-        title: 'Lỗi cập nhật trạng thái',
-        description: 'Không tìm thấy Group ID',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Find the orderData to get the post_id
-    const orderData = filteredOrders.find((orderData: { order: Order; post_id: string; post_description: string }) =>
-      orderData.order?.order_id === order.order_id
-    );
-
-    if (!orderData) {
-      toast({
-        title: 'Lỗi cập nhật trạng thái',
-        description: 'Không tìm thấy thông tin đơn hàng',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await updateOrderStatusMutation.mutateAsync({
-        groupId: selectedGroupId,
-        postId: orderData.post_id,
-        orderId: order.order_id,
-        data: {
-          new_status_code: newStatusCode,
-          note: `Trạng thái được cập nhật từ ${getStatusDisplayName(order.status_code)} thành ${getStatusDisplayName(newStatusCode)}`,
-          actor: user?.username || 'System'
-        }
-      });
-
-      toast({
-        title: 'Cập nhật trạng thái thành công',
-        description: `Đơn hàng ${order.order_id} đã được cập nhật thành ${getStatusDisplayName(newStatusCode)}`,
-      });
-
-      // Refetch data to update the UI
-      refetchUserOrders();
-      handleCancelEdit();
-    } catch (error: any) {
-      toast({
-        title: 'Lỗi cập nhật trạng thái',
-        description: error.detail || 'Không thể cập nhật trạng thái đơn hàng',
-        variant: 'destructive',
-      });
-    }
-  };
 
   const handleStatusChange = async (order: Order, newStatus: string) => {
     if (newStatus === order.status_code) {

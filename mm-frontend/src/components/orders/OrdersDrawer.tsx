@@ -60,10 +60,6 @@ export const OrdersDrawer: React.FC = () => {
     !ordersStatusFilter || ordersStatusFilter === "all" || order.status_code === ordersStatusFilter
   ) || [];
 
-  const getStatusDisplayName = (statusCode: string) => {
-    const status = statuses?.find(s => s.status_code === statusCode);
-    return status?.display_name || statusCode;
-  };
 
   // Calculate total revenue (order total - import price * total quantity)
   const calculateTotalRevenue = () => {
