@@ -13,7 +13,7 @@ services:
       - /home/minhbq/minhmom/images:/app/images
       - ./backend/config.prod.yaml:/app/config.yaml
     environment:
-      - MONGODB_URI=${MONGODB_URI:-mongodb://localhost:27017}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://root:change-me@192.168.100.232:27017/}
       - DB_NAME=${DB_NAME:-minhmom}
     restart: unless-stopped
     healthcheck:
@@ -22,8 +22,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - minhmom-network
+    network_mode: "host"
 
   # Frontend service
   frontend:
@@ -39,8 +38,7 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    networks:
-      - minhmom-network
+    network_mode: "host"
 
 networks:
   minhmom-network:
