@@ -269,9 +269,12 @@ export const orderApi = {
   getDashboardData: async (groupId: string): Promise<{
     totalRevenue: number;
     monthlyRevenue: number;
+    totalIncome: number;
+    monthlyIncome: number;
     totalOrders: number;
     monthlyOrders: number;
     monthlyRevenueData: Array<{ month: number; revenue: number }>;
+    monthlyIncomeData: Array<{ month: number; income: number }>;
     pendingOrders: number;
     cancelledOrders: number;
     newOrders: number;
@@ -283,9 +286,12 @@ export const orderApi = {
     const response: AxiosResponse<{
       totalRevenue: number;
       monthlyRevenue: number;
+      totalIncome: number;
+      monthlyIncome: number;
       totalOrders: number;
       monthlyOrders: number;
       monthlyRevenueData: Array<{ month: number; revenue: number }>;
+      monthlyIncomeData: Array<{ month: number; income: number }>;
       pendingOrders: number;
       cancelledOrders: number;
       newOrders: number;

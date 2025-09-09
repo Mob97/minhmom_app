@@ -16,8 +16,8 @@ export const DashboardScreen: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold text-muted-foreground">Access Denied</h2>
-          <p className="text-muted-foreground">This dashboard is only available to administrators.</p>
+          <h2 className="text-2xl font-semibold text-muted-foreground">Truy Cập Bị Từ Chối</h2>
+          <p className="text-muted-foreground">Bảng điều khiển này chỉ dành cho quản trị viên.</p>
         </div>
       </div>
     );
@@ -28,7 +28,7 @@ export const DashboardScreen: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading dashboard data...</p>
+          <p className="text-muted-foreground">Đang tải dữ liệu bảng điều khiển...</p>
         </div>
       </div>
     );
@@ -39,8 +39,8 @@ export const DashboardScreen: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold text-destructive">Error Loading Dashboard</h2>
-          <p className="text-muted-foreground">Failed to load dashboard data. Please try again later.</p>
+          <h2 className="text-2xl font-semibold text-destructive">Lỗi Tải Bảng Điều Khiển</h2>
+          <p className="text-muted-foreground">Không thể tải dữ liệu bảng điều khiển. Vui lòng thử lại sau.</p>
         </div>
       </div>
     );
@@ -48,56 +48,56 @@ export const DashboardScreen: React.FC = () => {
 
   const statusCards = [
     {
-      title: 'Pending Orders',
-      description: 'Orders not completed or cancelled',
+      title: 'Đơn Hàng Chờ Xử Lý',
+      description: 'Đơn hàng chưa hoàn thành hoặc hủy',
       value: dashboardData?.pendingOrders || 0,
       icon: Clock,
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-50',
     },
     {
-      title: 'Cancelled Orders',
-      description: 'Orders that were cancelled',
+      title: 'Đơn Hàng Đã Hủy',
+      description: 'Đơn hàng đã bị hủy',
       value: dashboardData?.cancelledOrders || 0,
       icon: XCircle,
       color: 'text-red-600',
       bgColor: 'bg-red-50',
     },
     {
-      title: 'New Orders',
-      description: 'Recently created orders',
+      title: 'Đơn Hàng Mới',
+      description: 'Đơn hàng vừa được tạo',
       value: dashboardData?.newOrders || 0,
       icon: Package,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
     {
-      title: 'Ordered',
-      description: 'Orders that have been placed',
+      title: 'Đã Đặt Hàng',
+      description: 'Đơn hàng đã được đặt',
       value: dashboardData?.orderedOrders || 0,
       icon: ShoppingCart,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
     },
     {
-      title: 'Received',
-      description: 'Orders received by supplier',
+      title: 'Đã Nhận Hàng',
+      description: 'Đơn hàng đã được nhà cung cấp nhận',
       value: dashboardData?.receivedOrders || 0,
       icon: Package,
       color: 'text-indigo-600',
       bgColor: 'bg-indigo-50',
     },
     {
-      title: 'Delivering',
-      description: 'Orders currently being delivered',
+      title: 'Đang Giao Hàng',
+      description: 'Đơn hàng đang được giao',
       value: dashboardData?.deliveringOrders || 0,
       icon: Truck,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
     },
     {
-      title: 'Completed',
-      description: 'Successfully completed orders',
+      title: 'Hoàn Thành',
+      description: 'Đơn hàng đã hoàn thành thành công',
       value: dashboardData?.doneOrders || 0,
       icon: CheckCircle,
       color: 'text-green-600',
@@ -108,122 +108,246 @@ export const DashboardScreen: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Bảng Điều Khiển</h1>
         <p className="text-muted-foreground">
-          Overview of orders and revenue for {new Date().getFullYear()}
+          Tổng quan đơn hàng và lãi năm {new Date().getFullYear()}
         </p>
       </div>
 
-      {/* Revenue Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Yearly Overview */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Tổng Quan Năm {new Date().getFullYear()}</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng Lãi</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat('vi-VN', {
+                  style: 'currency',
+                  currency: 'VND'
+                }).format(dashboardData?.totalRevenue || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Năm nay
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng Thu Nhập</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat('vi-VN', {
+                  style: 'currency',
+                  currency: 'VND'
+                }).format(dashboardData?.totalIncome || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Năm nay
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng Đơn Hàng</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardData?.totalOrders || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Tất cả thời gian
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tỷ Lệ Lãi</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {(dashboardData?.totalIncome || 0) > 0
+                  ? `${(((dashboardData?.totalRevenue || 0) / (dashboardData?.totalIncome || 1)) * 100).toFixed(1)}%`
+                  : '0%'
+                }
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Lãi / Thu nhập
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Monthly Overview */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Tổng Quan Tháng {new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Lãi Tháng Này</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat('vi-VN', {
+                  style: 'currency',
+                  currency: 'VND'
+                }).format(dashboardData?.monthlyRevenue || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Thu Nhập Tháng Này</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat('vi-VN', {
+                  style: 'currency',
+                  currency: 'VND'
+                }).format(dashboardData?.monthlyIncome || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Đơn Hàng Tháng Này</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardData?.monthlyOrders || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                {new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tỷ Lệ Lãi Tháng</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {(dashboardData?.monthlyIncome || 0) > 0
+                  ? `${(((dashboardData?.monthlyRevenue || 0) / (dashboardData?.monthlyIncome || 1)) * 100).toFixed(1)}%`
+                  : '0%'
+                }
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Lãi / Thu nhập
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Profit and Income Charts */}
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader>
+          <CardTitle>Lãi Theo Tháng</CardTitle>
+          <CardDescription>
+            Lãi hàng tháng được tính bằng (Tổng Đơn Hàng - Giá Nhập) cho năm {new Date().getFullYear()}
+          </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat('vi-VN', {
-                style: 'currency',
-                currency: 'VND'
-              }).format(dashboardData?.totalRevenue || 0)}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dashboardData?.monthlyRevenueData || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={(value) => new Date(2024, value - 1).toLocaleDateString('en-US', { month: 'short' })}
+                  />
+                  <YAxis
+                    tickFormatter={(value) => new Intl.NumberFormat('vi-VN', {
+                      style: 'currency',
+                      currency: 'VND',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    }).format(value)}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND'
+                      }).format(value),
+                      'Lãi'
+                    ]}
+                    labelFormatter={(label) => `Tháng ${label}`}
+                  />
+                  <Bar dataKey="revenue" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <p className="text-xs text-muted-foreground">
-              This year
-            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader>
+            <CardTitle>Thu Nhập Theo Tháng</CardTitle>
+            <CardDescription>
+              Tổng giá trị đơn hàng hàng tháng cho năm {new Date().getFullYear()}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat('vi-VN', {
-                style: 'currency',
-                currency: 'VND'
-              }).format(dashboardData?.monthlyRevenue || 0)}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dashboardData?.monthlyIncomeData || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={(value) => new Date(2024, value - 1).toLocaleDateString('en-US', { month: 'short' })}
+                  />
+                  <YAxis
+                    tickFormatter={(value) => new Intl.NumberFormat('vi-VN', {
+                      style: 'currency',
+                      currency: 'VND',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    }).format(value)}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND'
+                      }).format(value),
+                      'Thu Nhập'
+                    ]}
+                    labelFormatter={(label) => `Tháng ${label}`}
+                  />
+                  <Bar dataKey="income" fill="#82ca9d" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.totalOrders || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              All time
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month Orders</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardData?.monthlyOrders || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Revenue Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue by Month</CardTitle>
-          <CardDescription>
-            Monthly revenue calculated as (Order Total - Import Price) for {new Date().getFullYear()}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dashboardData?.monthlyRevenueData || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="month"
-                  tickFormatter={(value) => new Date(2024, value - 1).toLocaleDateString('en-US', { month: 'short' })}
-                />
-                <YAxis
-                  tickFormatter={(value) => new Intl.NumberFormat('vi-VN', {
-                    style: 'currency',
-                    currency: 'VND',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0
-                  }).format(value)}
-                />
-                <Tooltip
-                  formatter={(value: number) => [
-                    new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND'
-                    }).format(value),
-                    'Revenue'
-                  ]}
-                  labelFormatter={(label) => `Month ${label}`}
-                />
-                <Bar dataKey="revenue" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Order Status Cards */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight mb-4">Order Status Overview</h2>
+        <h2 className="text-2xl font-bold tracking-tight mb-4">Tổng Quan Trạng Thái Đơn Hàng</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {statusCards.map((card) => (
             <Card key={card.title}>

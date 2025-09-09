@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Path
 from datetime import datetime, timezone
 from ..auth import require_admin
 from ..db import get_db, posts_col
-from ..utils import to_local_time
 
 router = APIRouter()
 
@@ -55,14 +54,18 @@ async def get_dashboard_data(
             order["post_id"] = post["_id"]
             all_orders.append(order)
 
-    # Calculate revenue and statistics
+    # Calculate revenue, income and statistics
     total_revenue = 0
     monthly_revenue = 0
+    total_income = 0
+    monthly_income = 0
     monthly_revenue_data = []
+    monthly_income_data = []
 
-    # Initialize monthly revenue data
+    # Initialize monthly revenue and income data
     for month in range(1, 13):
         monthly_revenue_data.append({"month": month, "revenue": 0})
+        monthly_income_data.append({"month": month, "income": 0})
 
     # Order status counters
     status_counts = {
@@ -108,7 +111,7 @@ async def get_dashboard_data(
         # Calculate revenue (order total - import price) - exclude CANCELLED orders
         status = order.get("status_code", "NEW")
 
-        # Only calculate revenue for non-CANCELLED orders
+        # Only calculate revenue and income for non-CANCELLED orders with available import_price
         if status != "CANCELLED":
             order_total = 0
             if order.get("price_calc") and order["price_calc"].get("total"):
@@ -117,17 +120,27 @@ async def get_dashboard_data(
             post_id = order.get("post_id")
             import_price = post_import_prices.get(post_id, 0) if post_id else 0
 
-            # Revenue = order total - import price (only if order total > import price)
-            if order_total > import_price:
-                revenue = order_total - import_price
-                total_revenue += revenue
+            # Only calculate revenue and income if import_price is available (not 0 or None)
+            if import_price > 0 and order_total > 0:
+                # Calculate income (total order value)
+                total_income += order_total
+                monthly_income_data[order_month - 1]["income"] += order_total
 
-                # Add to monthly revenue
-                monthly_revenue_data[order_month - 1]["revenue"] += revenue
-
-                # Add to current month revenue
+                # Add to current month income
                 if order_month == current_month:
-                    monthly_revenue += revenue
+                    monthly_income += order_total
+
+                # Calculate revenue (order total - import price)
+                if order_total > import_price:
+                    revenue = order_total - import_price
+                    total_revenue += revenue
+
+                    # Add to monthly revenue
+                    monthly_revenue_data[order_month - 1]["revenue"] += revenue
+
+                    # Add to current month revenue
+                    if order_month == current_month:
+                        monthly_revenue += revenue
 
         # Count orders by status
         status = order.get("status_code", "NEW")
@@ -140,9 +153,12 @@ async def get_dashboard_data(
     return {
         "totalRevenue": total_revenue,
         "monthlyRevenue": monthly_revenue,
+        "totalIncome": total_income,
+        "monthlyIncome": monthly_income,
         "totalOrders": total_orders,
         "monthlyOrders": monthly_orders,
         "monthlyRevenueData": monthly_revenue_data,
+        "monthlyIncomeData": monthly_income_data,
         "pendingOrders": pending_orders,
         "cancelledOrders": status_counts["CANCELLED"],
         "newOrders": status_counts["NEW"],
