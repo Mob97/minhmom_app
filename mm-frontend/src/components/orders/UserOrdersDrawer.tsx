@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +10,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAppStore } from '@/store/app-store';
 import { useUserOrdersWithStats, useStatuses, useUpdateOrderStatus, useUpdateOrder, useDeleteOrder } from '@/hooks/use-api';
-import { X, ExternalLink, Printer, Save, Edit2, Trash2 } from 'lucide-react';
+import { X, ExternalLink, Printer, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { EditOrderModal } from './EditOrderModal';
@@ -374,6 +373,68 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
     setOrdersToUpdate([]);
   };
 
+  const handleBatchStatusUpdate = async (newStatusCode: string) => {
+    if (selectedOrders.size === 0) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng chọn ít nhất một đơn hàng để cập nhật",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedGroupId) {
+      toast({
+        title: 'Lỗi cập nhật trạng thái',
+        description: 'Không tìm thấy Group ID',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const selectedOrdersData = filteredOrders.filter((orderData: { order: Order; post_id: string; post_description: string }) =>
+      selectedOrders.has(orderData.order?.order_id || '')
+    );
+
+    try {
+      // Update all selected orders to the new status
+      const updatePromises = selectedOrdersData.map((orderData: { order: Order; post_id: string; post_description: string }) =>
+        updateOrderStatusMutation.mutateAsync({
+          groupId: selectedGroupId,
+          postId: orderData.post_id,
+          orderId: orderData.order?.order_id || '',
+          data: {
+            new_status_code: newStatusCode,
+            note: `Trạng thái được cập nhật thành ${getStatusDisplayName(newStatusCode)}`,
+            actor: user?.username || 'System'
+          }
+        })
+      );
+
+      await Promise.all(updatePromises);
+
+      // Clear selections
+      setSelectedOrders(new Set());
+
+      // Show success message
+      toast({
+        title: "Thành công",
+        description: `Đã cập nhật ${selectedOrdersData.length} đơn hàng thành trạng thái ${getStatusDisplayName(newStatusCode)}`,
+      });
+
+      // Refetch data to update the UI
+      refetchUserOrders();
+
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: "Lỗi",
+        description: "Có lỗi xảy ra khi cập nhật trạng thái đơn hàng",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleStartEdit = (order: Order) => {
     setEditingOrderId(order.order_id);
     setNewStatusCode(order.status_code);
@@ -433,6 +494,62 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
       // Refetch data to update the UI
       refetchUserOrders();
       handleCancelEdit();
+    } catch (error: any) {
+      toast({
+        title: 'Lỗi cập nhật trạng thái',
+        description: error.detail || 'Không thể cập nhật trạng thái đơn hàng',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleStatusChange = async (order: Order, newStatus: string) => {
+    if (newStatus === order.status_code) {
+      return; // No change needed
+    }
+
+    if (!selectedGroupId) {
+      toast({
+        title: 'Lỗi cập nhật trạng thái',
+        description: 'Không tìm thấy Group ID',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Find the orderData to get the post_id
+    const orderData = filteredOrders.find((orderData: { order: Order; post_id: string; post_description: string }) =>
+      orderData.order?.order_id === order.order_id
+    );
+
+    if (!orderData) {
+      toast({
+        title: 'Lỗi cập nhật trạng thái',
+        description: 'Không tìm thấy thông tin đơn hàng',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await updateOrderStatusMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: orderData.post_id,
+        orderId: order.order_id,
+        data: {
+          new_status_code: newStatus,
+          note: `Trạng thái được cập nhật từ ${getStatusDisplayName(order.status_code)} thành ${getStatusDisplayName(newStatus)}`,
+          actor: user?.username || 'System'
+        }
+      });
+
+      toast({
+        title: 'Cập nhật trạng thái thành công',
+        description: `Đơn hàng ${order.order_id} đã được cập nhật thành ${getStatusDisplayName(newStatus)}`,
+      });
+
+      // Refetch data to update the UI
+      refetchUserOrders();
     } catch (error: any) {
       toast({
         title: 'Lỗi cập nhật trạng thái',
@@ -665,6 +782,26 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                   </label>
                 </div>
 
+                {/* Batch Update Buttons */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBatchStatusUpdate('WAITING_FOR_PAYMENT')}
+                  disabled={selectedOrders.size === 0}
+                  className="flex items-center space-x-2"
+                >
+                  <span>Chờ thanh toán ({selectedOrders.size})</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBatchStatusUpdate('DONE')}
+                  disabled={selectedOrders.size === 0}
+                  className="flex items-center space-x-2"
+                >
+                  <span>Hoàn thành ({selectedOrders.size})</span>
+                </Button>
+
                 {/* Print Button */}
                 <Button
                   variant="outline"
@@ -696,14 +833,14 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                           onCheckedChange={handleSelectAll}
                         />
                       </TableHead>
-                      <TableHead>Tên sản phẩm</TableHead>
-                      <TableHead>Số lượng</TableHead>
+                      <TableHead className="w-96">Tên sản phẩm</TableHead>
+                      <TableHead className="w-24">Số lượng</TableHead>
                       <TableHead>Loại</TableHead>
-                      <TableHead>Tổng cộng</TableHead>
-                      <TableHead>Trạng thái</TableHead>
+                      <TableHead className="w-40">Tổng cộng</TableHead>
+                      <TableHead className="w-48">Trạng thái</TableHead>
                       <TableHead>Ghi chú</TableHead>
-                      <TableHead>Thời gian</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
+                      <TableHead className="w-36">Thời gian</TableHead>
+                      <TableHead className="text-right w-40">Thao tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -720,84 +857,56 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                               onCheckedChange={(checked) => handleOrderSelect(orderId, checked as boolean)}
                             />
                           </TableCell>
-                          <TableCell>
-                            {order?.matched_item?.name ? (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-0 h-auto text-left justify-start"
-                                onClick={() => window.open(order?.comment_url || '#', '_blank')}
-                              >
-                                {order.matched_item.name}
-                              </Button>
-                            ) : (
-                              '—'
-                            )}
+                          <TableCell className="w-48">
+                            <div className="truncate">
+                              {order?.matched_item?.name ? (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 h-auto text-left justify-start truncate"
+                                  onClick={() => window.open(order?.comment_url || '#', '_blank')}
+                                >
+                                  {order.matched_item.name}
+                                </Button>
+                              ) : (
+                                '—'
+                              )}
+                            </div>
                           </TableCell>
-                          <TableCell>{order?.qty || '—'}</TableCell>
+                          <TableCell className="w-20">{order?.qty || '—'}</TableCell>
                           <TableCell>{order?.type || '—'}</TableCell>
-                          <TableCell>
+                          <TableCell className="w-24">
                             {order?.price_calc?.total ? formatCurrency(order.price_calc.total) : '—'}
                           </TableCell>
-                          <TableCell>
-                            {editingOrderId === orderId ? (
-                              <div className="flex items-center space-x-2">
-                                <Select
-                                  value={newStatusCode}
-                                  onValueChange={setNewStatusCode}
-                                  disabled={updateOrderStatusMutation.isPending}
-                                >
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {statuses?.map((status) => (
-                                      <SelectItem key={status.status_code} value={status.status_code}>
-                                        {status.display_name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleUpdateStatus(order)}
-                                  disabled={updateOrderStatusMutation.isPending}
-                                >
-                                  <Save className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={handleCancelEdit}
-                                >
-                                  Hủy
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center space-x-2">
-                                <Badge className={getStatusColor(order?.status_code || '')}>
-                                  {getStatusDisplayName(order?.status_code || '')}
-                                </Badge>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleStartEdit(order)}
-                                  disabled={updateOrderStatusMutation.isPending}
-                                >
-                                  Sửa
-                                </Button>
-                              </div>
-                            )}
+                          <TableCell className="w-48">
+                            <Select
+                              value={order?.status_code || undefined}
+                              onValueChange={(value: string) => handleStatusChange(order, value)}
+                              disabled={updateOrderStatusMutation.isPending}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statuses?.map((status) => (
+                                  <SelectItem key={status.status_code} value={status.status_code}>
+                                    {status.display_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <div className="max-w-32 truncate" title={order?.note || ''}>
                               {order?.note || '—'}
                             </div>
                           </TableCell>
-                          <TableCell>
-                            {formatDateTime(order?.comment_created_time)}
+                          <TableCell className="w-32">
+                            <div className="text-xs">
+                              {formatDateTime(order?.comment_created_time)}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right w-20">
                             <div className="flex items-center justify-end space-x-1">
                               <Button
                                 variant="ghost"

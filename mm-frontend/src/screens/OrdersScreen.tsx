@@ -140,6 +140,45 @@ export const OrdersScreen: React.FC = () => {
     }
   };
 
+  const handleStatusChange = async (order: Order, newStatus: string) => {
+    if (newStatus === order.status_code) {
+      return; // No change needed
+    }
+
+    if (!order.post_id) {
+      toast({
+        title: 'Error updating status',
+        description: 'Post ID not found for this order',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await updateOrderStatusMutation.mutateAsync({
+        groupId: selectedGroupId || '',
+        postId: order.post_id,
+        orderId: order.order_id,
+        data: {
+          new_status_code: newStatus,
+          note: `Status updated from ${getStatusDisplayName(order.status_code)} to ${getStatusDisplayName(newStatus)}`,
+          actor: 'admin'
+        }
+      });
+
+      toast({
+        title: 'Status updated successfully',
+        description: `Order ${order.order_id} status updated to ${getStatusDisplayName(newStatus)}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error updating status',
+        description: error.detail || 'Failed to update order status',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleProductNameClick = (order: Order) => {
     if (order.post_id) {
       setSelectedPostId(order.post_id);
@@ -402,16 +441,22 @@ export const OrdersScreen: React.FC = () => {
                       </div>
                     ) : (
                       <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(order.status_code)}>
-                          {getStatusDisplayName(order.status_code)}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleStartEdit(order)}
+                        <Select
+                          value={order.status_code || undefined}
+                          onValueChange={(value: string) => handleStatusChange(order, value)}
+                          disabled={updateOrderStatusMutation.isPending}
                         >
-                          Edit
-                        </Button>
+                          <SelectTrigger className="w-40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statuses?.map((status) => (
+                              <SelectItem key={status.status_code} value={status.status_code}>
+                                {status.display_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </TableCell>

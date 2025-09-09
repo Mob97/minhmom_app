@@ -511,30 +511,25 @@ export const OrdersDrawer: React.FC = () => {
                           }
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="secondary">
-                              {getStatusDisplayName(order.status_code)}
-                            </Badge>
-                            <Select
-                              value={order.status_code || undefined}
-                              onValueChange={(value: string) => handleStatusChange(
-                                order.order_id || order.comment_id || '',
-                                value
-                              )}
-                              disabled={updateOrderStatusMutation.isPending}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {statuses?.map((status) => (
-                                  <SelectItem key={status.status_code} value={status.status_code}>
-                                    {status.display_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Select
+                            value={order.status_code || undefined}
+                            onValueChange={(value: string) => handleStatusChange(
+                              order.order_id || order.comment_id || '',
+                              value
+                            )}
+                            disabled={updateOrderStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statuses?.map((status) => (
+                                <SelectItem key={status.status_code} value={status.status_code}>
+                                  {status.display_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           <div className="max-w-32 truncate" title={order.note || ''}>
