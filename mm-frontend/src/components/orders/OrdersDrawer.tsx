@@ -84,6 +84,21 @@ export const OrdersDrawer: React.FC = () => {
 
   const totalRevenue = calculateTotalRevenue();
 
+  // Calculate NEW orders count by type
+  const calculateNewOrdersByType = () => {
+    if (!filteredOrders) return {};
+
+    return filteredOrders.reduce((acc, order) => {
+      if (order.status_code === 'NEW') {
+        const type = order.type || 'Unknown';
+        acc[type] = (acc[type] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+  };
+
+  const newOrdersByType = calculateNewOrdersByType();
+
   const handleEditImportPrice = () => {
     setImportPriceValue(post?.import_price?.toString() || '');
     setIsEditingImportPrice(true);
@@ -278,7 +293,7 @@ export const OrdersDrawer: React.FC = () => {
                      {/* Import Price - Admin Only */}
                      {isAdmin && (
                        <div>
-                         <h4 className="text-sm font-medium text-muted-foreground mb-1">Import Price:</h4>
+                         <h4 className="text-sm font-medium text-muted-foreground mb-1">Giá nhập:</h4>
 
                          {isEditingImportPrice ? (
                            <div className="flex items-center space-x-1">
@@ -357,11 +372,28 @@ export const OrdersDrawer: React.FC = () => {
                         />
                       </div>
                     )}
+
                   </div>
                 ) : null}
               </div>
 
               <div className="flex flex-col items-end space-y-2 ml-4">
+                {/* Statistics by Type */}
+                {Object.keys(newOrdersByType).length > 0 && (
+                  <div className="text-right">
+                    <div className="text-sm text-muted-foreground mb-1">Đơn hàng chưa đặt:</div>
+                    <div className="space-y-1">
+                      {Object.entries(newOrdersByType)
+                        .sort(([, a], [, b]) => b - a) // Sort by count descending
+                        .map(([type, count]) => (
+                          <div key={type} className="text-sm">
+                            {type}: {count}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Revenue Display */}
                 {isAdmin && post?.import_price && (
                   <div className="text-right">
@@ -388,6 +420,7 @@ export const OrdersDrawer: React.FC = () => {
                 </div>
               </div>
             </div>
+
           </DrawerHeader>
 
           <div className="flex-1 overflow-auto p-6">
