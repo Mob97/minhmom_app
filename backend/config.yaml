@@ -1,0 +1,28 @@
+# Backend Configuration
+database:
+  mongodb_uri: "mongodb://root:change-me@192.168.100.232:27017/"
+  db_name: "minhmom"
+  default_group_id: null
+
+# Image serving configuration
+images:
+  base_path: "D:/01_Projects/09_minhmom/post_images"
+  posts_dir: "posts"
+  comments_dir: "comments"
+  allowed_extensions: [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+  max_file_size_mb: 10
+
+# API configuration
+api:
+  title: "MinhMom Backend"
+  version: "0.1.0"
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

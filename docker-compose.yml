@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Backend service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: minhmom-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/images:/app/images
+      - ./backend/config.prod.yaml:/app/config.yaml
+    environment:
+      - MONGODB_URI=${MONGODB_URI:-mongodb://your-mongodb-host:27017}
+      - DB_NAME=${DB_NAME:-minhmom}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - minhmom-network
+
+  # Frontend service
+  frontend:
+    build:
+      context: ./mm-frontend
+      dockerfile: Dockerfile
+    container_name: minhmom-frontend
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+      - VITE_GROUP_ID=${VITE_GROUP_ID:-2847737995453663}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - minhmom-network
+
+networks:
+  minhmom-network:
+    driver: bridge
+
+volumes:
+  images:
+    driver: local
