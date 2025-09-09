@@ -11,7 +11,6 @@ import { OrdersDrawer } from '@/components/orders/OrdersDrawer';
 import { ImageGallery } from '@/components/ui/image-gallery';
 import { Pagination } from '@/components/ui/pagination';
 import { SortableHeader, type SortConfig } from '@/components/ui/sortable-header';
-import { useAuth } from '@/contexts/AuthContext';
 
 export const PostsScreen: React.FC = () => {
   const {
@@ -21,7 +20,6 @@ export const PostsScreen: React.FC = () => {
     setSelectedPostId,
     setOrdersDrawerOpen
   } = useAppStore();
-  const { isAdmin } = useAuth();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);

@@ -86,6 +86,10 @@ export interface OrderUser {
   address?: string;
   phone_number?: string;
   avatar_url?: string;
+  // Legacy properties for backward compatibility
+  username?: string;
+  uid?: string;
+  url?: string;
 }
 
 export interface CreateUserRequest {
