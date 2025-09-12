@@ -50,7 +50,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   const visiblePages = getVisiblePages();
 
   return (
-    <div className={`flex items-center justify-center space-x-2 ${className}`}>
+    <div className={`flex items-center justify-center space-x-1 sm:space-x-2 ${className}`}>
       <Button
         variant="outline"
         size="sm"
@@ -61,30 +61,64 @@ export const Pagination: React.FC<PaginationProps> = ({
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      {visiblePages.map((page, index) => {
-        if (page === '...') {
+      {/* Show fewer pages on mobile */}
+      <div className="hidden sm:flex items-center space-x-1">
+        {visiblePages.map((page, index) => {
+          if (page === '...') {
+            return (
+              <div key={`dots-${index}`} className="flex items-center justify-center h-8 w-8">
+                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+              </div>
+            );
+          }
+
+          const pageNumber = page as number;
+          const isCurrentPage = pageNumber === currentPage;
+
           return (
-            <div key={`dots-${index}`} className="flex items-center justify-center h-8 w-8">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            </div>
+            <Button
+              key={pageNumber}
+              variant={isCurrentPage ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => onPageChange(pageNumber)}
+              className="h-8 w-8 p-0"
+            >
+              {pageNumber}
+            </Button>
           );
-        }
+        })}
+      </div>
 
-        const pageNumber = page as number;
-        const isCurrentPage = pageNumber === currentPage;
-
-        return (
+      {/* Mobile: Show only current page and adjacent pages */}
+      <div className="flex sm:hidden items-center space-x-1">
+        {currentPage > 1 && (
           <Button
-            key={pageNumber}
-            variant={isCurrentPage ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
-            onClick={() => onPageChange(pageNumber)}
+            onClick={() => onPageChange(currentPage - 1)}
             className="h-8 w-8 p-0"
           >
-            {pageNumber}
+            {currentPage - 1}
           </Button>
-        );
-      })}
+        )}
+        <Button
+          variant="default"
+          size="sm"
+          className="h-8 w-8 p-0"
+        >
+          {currentPage}
+        </Button>
+        {currentPage < totalPages && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            className="h-8 w-8 p-0"
+          >
+            {currentPage + 1}
+          </Button>
+        )}
+      </div>
 
       <Button
         variant="outline"

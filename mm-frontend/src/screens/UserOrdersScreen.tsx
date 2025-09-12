@@ -118,17 +118,17 @@ export const UserOrdersScreen: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h2 className="text-2xl font-bold">{t.userOrders.title}</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-bold">{t.userOrders.title}</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             {total} {t.userOrders.title.toLowerCase()} ({t.common.page} {currentPage} / {totalPages})
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button onClick={() => refetch()}>
+          <Button onClick={() => refetch()} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             {t.common.refresh}
           </Button>
@@ -136,7 +136,7 @@ export const UserOrdersScreen: React.FC = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -169,83 +169,154 @@ export const UserOrdersScreen: React.FC = () => {
           <p className="text-muted-foreground text-lg">{t.userOrders.noUsers}</p>
         </div>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <SortableHeader
-                    field="name"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    {t.users.name}
-                  </SortableHeader>
-                </TableHead>
-                <TableHead>{t.users.address}</TableHead>
-                <TableHead>{t.users.phoneNumber}</TableHead>
-                <TableHead>
-                  <SortableHeader
-                    field="order_count"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    {t.userOrders.orderCount}
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="text-right">{t.common.actions}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.fb_uid}>
-                  <TableCell className="font-medium">
-                    {user.name ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
-                        className="p-0 h-auto text-left justify-start"
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block">
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <SortableHeader
+                        field="name"
+                        sortConfig={sortConfig}
+                        onSort={handleSort}
                       >
-                        {user.name}
-                      </Button>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-xs truncate">
-                    {user.addresses && user.addresses.length > 0 ? user.addresses[0] : '—'}
-                    {user.addresses && user.addresses.length > 1 && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        (+{user.addresses.length - 1})
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.phone_number || '—'}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary">
-                      {user.order_count}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end space-x-2">
+                        {t.users.name}
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead>{t.users.address}</TableHead>
+                    <TableHead>{t.users.phoneNumber}</TableHead>
+                    <TableHead>
+                      <SortableHeader
+                        field="order_count"
+                        sortConfig={sortConfig}
+                        onSort={handleSort}
+                      >
+                        {t.userOrders.orderCount}
+                      </SortableHeader>
+                    </TableHead>
+                    <TableHead className="text-right">{t.common.actions}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.fb_uid}>
+                      <TableCell className="font-medium">
+                        {user.name ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
+                            className="p-0 h-auto text-left justify-start"
+                          >
+                            {user.name}
+                          </Button>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-xs truncate">
+                        {user.addresses && user.addresses.length > 0 ? user.addresses[0] : '—'}
+                        {user.addresses && user.addresses.length > 1 && (
+                          <span className="text-xs text-muted-foreground ml-1">
+                            (+{user.addresses.length - 1})
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.phone_number || '—'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary">
+                          {user.order_count}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewUserOrders(user.fb_uid)}
+                            title="Xem đơn hàng"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-4">
+            {users.map((user) => (
+              <Card key={user.fb_uid} className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-2">
+                        {user.name ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
+                            className="p-0 h-auto text-left justify-start font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            <span className="truncate text-sm sm:text-base">
+                              {user.name}
+                            </span>
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Địa chỉ: </span>
+                          <span className="text-foreground">
+                            {user.addresses && user.addresses.length > 0 ? user.addresses[0] : '—'}
+                            {user.addresses && user.addresses.length > 1 && (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                (+{user.addresses.length - 1})
+                              </span>
+                            )}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-muted-foreground">SĐT: </span>
+                          <span className="text-foreground">
+                            {user.phone_number || '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end space-y-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {user.order_count} đơn hàng
+                      </Badge>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleViewUserOrders(user.fb_uid)}
                         title="Xem đơn hàng"
+                        className="h-8 w-8 p-0"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Pagination */}

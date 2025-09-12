@@ -216,16 +216,16 @@ export const OrdersScreen: React.FC = () => {
   const ordersList = filteredOrders || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h2 className="text-2xl font-bold">Quản lý đơn hàng</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-bold">Quản lý đơn hàng</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             {total} đơn hàng ({t.common.page} {currentPage} / {totalPages})
           </p>
         </div>
-        <Button onClick={() => refetch()}>
+        <Button onClick={() => refetch()} className="w-full sm:w-auto">
           <RefreshCw className="h-4 w-4 mr-2" />
           {t.common.refresh}
         </Button>
@@ -243,7 +243,7 @@ export const OrdersScreen: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {statuses?.map((status) => (
               <div key={status.status_code} className="flex items-center space-x-2">
                 <Checkbox
@@ -269,188 +269,315 @@ export const OrdersScreen: React.FC = () => {
           <p className="text-muted-foreground text-lg">Không có đơn hàng nào</p>
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="user.name"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Người dùng
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="matched_item.name"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Tên sản phẩm
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3">Loại sản phẩm</TableHead>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="qty"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Số Lượng
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3">Loại</TableHead>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="price_calc.total"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Tổng Cộng
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="status_code"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Trạng thái
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="comment_created_time"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Thời gian
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3 text-right">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ordersList.map((order: Order) => (
-                <TableRow key={order.order_id || order.comment_id}>
-                  <TableCell className="px-6 py-4">
-                    {order.user ? (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm">
-                          {order.user?.name || order.user?.username || order.user?.uid}
-                        </span>
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="user.name"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Người dùng
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="matched_item.name"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Tên sản phẩm
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3">Loại sản phẩm</TableHead>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="qty"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Số Lượng
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3">Loại</TableHead>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="price_calc.total"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Tổng Cộng
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="status_code"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Trạng thái
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="comment_created_time"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Thời gian
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3 text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ordersList.map((order: Order) => (
+                  <TableRow key={order.order_id || order.comment_id}>
+                    <TableCell className="px-6 py-4">
+                      {order.user ? (
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm">
+                            {order.user?.name || order.user?.username || order.user?.uid}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(order.user?.url || `https://www.facebook.com/${order.user?.uid}`, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <div className="max-w-xs">
                         <Button
-                          variant="ghost"
+                          variant="link"
                           size="sm"
-                          onClick={() => window.open(order.user?.url || `https://www.facebook.com/${order.user?.uid}`, '_blank')}
+                          className="p-0 h-auto font-normal text-left justify-start text-blue-600 hover:text-blue-800"
+                          onClick={() => handleProductNameClick(order)}
+                          disabled={!order.post_id}
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <p className="truncate">
+                            {order.matched_item?.name || 'Chưa xác định'}
+                          </p>
                         </Button>
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
-                    <div className="max-w-xs">
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 h-auto font-normal text-left justify-start text-blue-600 hover:text-blue-800"
-                        onClick={() => handleProductNameClick(order)}
-                        disabled={!order.post_id}
-                      >
-                        <p className="truncate">
-                          {order.matched_item?.name || 'Chưa xác định'}
-                        </p>
-                      </Button>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <Badge variant="outline">
+                        {order.matched_item?.type || order.type || 'Chưa xác định'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      {t.currency.formatNumber(order.qty)}
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      {order.type || '—'}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 font-medium">
+                      {order.price_calc ?
+                        t.currency.format(order.price_calc.total) :
+                        '—'
+                      }
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      {editingOrderId === order.order_id ? (
+                        <div className="flex items-center space-x-2">
+                          <Select value={newStatusCode} onValueChange={setNewStatusCode}>
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statuses?.map((status) => (
+                                <SelectItem key={status.status_code} value={status.status_code}>
+                                  {status.display_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpdateStatus(order)}
+                            disabled={updateOrderStatusMutation.isPending}
+                          >
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEdit}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <Select
+                            value={order.status_code || undefined}
+                            onValueChange={(value: string) => handleStatusChange(order, value)}
+                            disabled={updateOrderStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statuses?.map((status) => (
+                                <SelectItem key={status.status_code} value={status.status_code}>
+                                  {status.display_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-muted-foreground">
+                      {order.comment_created_time ? new Date(order.comment_created_time).toLocaleString('vi-VN') : '—'}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-4">
+            {ordersList.map((order: Order) => (
+              <div key={order.order_id || order.comment_id} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 mb-2">
+                      {order.user ? (
+                        <>
+                          <span className="text-sm font-medium truncate">
+                            {order.user?.name || order.user?.username || order.user?.uid}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 flex-shrink-0"
+                            onClick={() => window.open(order.user?.url || `https://www.facebook.com/${order.user?.uid}`, '_blank')}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
                     </div>
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
-                    <Badge variant="outline">
-                      {order.matched_item?.type || order.type || 'Chưa xác định'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
-                    {t.currency.formatNumber(order.qty)}
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
-                    {order.type || '—'}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 font-medium">
-                    {order.price_calc ?
-                      t.currency.format(order.price_calc.total) :
-                      '—'
-                    }
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
-                    {editingOrderId === order.order_id ? (
-                      <div className="flex items-center space-x-2">
-                        <Select value={newStatusCode} onValueChange={setNewStatusCode}>
-                          <SelectTrigger className="w-40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statuses?.map((status) => (
-                              <SelectItem key={status.status_code} value={status.status_code}>
-                                {status.display_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 h-auto font-medium text-left justify-start text-blue-600 hover:text-blue-800 mb-2"
+                      onClick={() => handleProductNameClick(order)}
+                      disabled={!order.post_id}
+                    >
+                      <p className="truncate text-sm sm:text-base">
+                        {order.matched_item?.name || 'Chưa xác định'}
+                      </p>
+                    </Button>
+
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Badge variant="outline" className="text-xs">
+                        {order.matched_item?.type || order.type || 'Chưa xác định'}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Qty: {t.currency.formatNumber(order.qty)}
+                      </span>
+                    </div>
+
+                    <div className="text-sm font-medium">
+                      {order.price_calc ?
+                        t.currency.format(order.price_calc.total) :
+                        '—'
+                      }
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end space-y-2">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {editingOrderId === order.order_id ? (
+                    <div className="flex flex-col space-y-2">
+                      <Select value={newStatusCode} onValueChange={setNewStatusCode}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statuses?.map((status) => (
+                            <SelectItem key={status.status_code} value={status.status_code}>
+                              {status.display_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex space-x-2">
                         <Button
                           size="sm"
                           onClick={() => handleUpdateStatus(order)}
                           disabled={updateOrderStatusMutation.isPending}
+                          className="flex-1"
                         >
-                          <Save className="h-4 w-4" />
+                          <Save className="h-4 w-4 mr-1" />
+                          Lưu
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={handleCancelEdit}
+                          className="flex-1"
                         >
-                          Cancel
+                          Hủy
                         </Button>
                       </div>
-                    ) : (
-                      <div className="flex items-center space-x-2">
-                        <Select
-                          value={order.status_code || undefined}
-                          onValueChange={(value: string) => handleStatusChange(order, value)}
-                          disabled={updateOrderStatusMutation.isPending}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statuses?.map((status) => (
-                              <SelectItem key={status.status_code} value={status.status_code}>
-                                {status.display_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-sm text-muted-foreground">
-                    {order.comment_created_time ? new Date(order.comment_created_time).toLocaleString('vi-VN') : '—'}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                  ) : (
+                    <Select
+                      value={order.status_code || undefined}
+                      onValueChange={(value: string) => handleStatusChange(order, value)}
+                      disabled={updateOrderStatusMutation.isPending}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statuses?.map((status) => (
+                          <SelectItem key={status.status_code} value={status.status_code}>
+                            {status.display_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  {order.comment_created_time ? new Date(order.comment_created_time).toLocaleString('vi-VN') : '—'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Pagination */}

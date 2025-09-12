@@ -134,16 +134,16 @@ export const PostsScreen: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h2 className="text-2xl font-bold">{t.posts.title}</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-bold">{t.posts.title}</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             {total} {t.common.post.toLowerCase()} ({t.common.page} {currentPage} / {totalPages})
           </p>
         </div>
-        <Button onClick={() => refetch()}>
+        <Button onClick={() => refetch()} className="w-full sm:w-auto">
           <RefreshCw className="h-4 w-4 mr-2" />
           {t.common.refresh}
         </Button>
@@ -168,104 +168,171 @@ export const PostsScreen: React.FC = () => {
           <p className="text-muted-foreground text-lg">{t.posts.noPosts}</p>
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="created_time"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    {t.posts.itemName}
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3">{t.posts.itemType}</TableHead>
-                <TableHead className="px-6 py-3">{t.common.description}</TableHead>
-                <TableHead className="px-6 py-3">Images</TableHead>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="created_time"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Thời gian tạo
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3">
-                  <SortableHeader
-                    field="updated_time"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  >
-                    Thời gian cập nhật
-                  </SortableHeader>
-                </TableHead>
-                <TableHead className="px-6 py-3 text-right">{t.common.actions}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {posts.map((post) => (
-                <TableRow key={post.id}>
-                  <TableCell className="px-6 py-4 font-medium">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 h-auto font-normal text-left justify-start"
-                        onClick={() => window.open(getPostUrl(post.id), '_blank')}
-                      >
-                        {post.items[0]?.name || 'No item name'}
-                      </Button>
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="created_time"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      {t.posts.itemName}
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3">{t.posts.itemType}</TableHead>
+                  <TableHead className="px-6 py-3">{t.common.description}</TableHead>
+                  <TableHead className="px-6 py-3">Images</TableHead>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="created_time"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Thời gian tạo
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3">
+                    <SortableHeader
+                      field="updated_time"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    >
+                      Thời gian cập nhật
+                    </SortableHeader>
+                  </TableHead>
+                  <TableHead className="px-6 py-3 text-right">{t.common.actions}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {posts.map((post) => (
+                  <TableRow key={post.id}>
+                    <TableCell className="px-6 py-4 font-medium">
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 h-auto font-normal text-left justify-start"
+                          onClick={() => window.open(getPostUrl(post.id), '_blank')}
+                        >
+                          {post.items[0]?.name || 'No item name'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(getPostUrl(post.id), '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <Badge variant="outline">
+                        {post.items[0]?.type || 'No type'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <div className="max-w-48">
+                        <p className="truncate">
+                          {post.description || 'No description'}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-6 py-4">
+                      <ImageGallery
+                        images={post.local_images || []}
+                        postId={post.id}
+                        maxDisplay={2}
+                      />
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-muted-foreground">
+                      {formatDateTime(post.created_time)}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-sm text-muted-foreground">
+                      {formatDateTime(post.updated_time)}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-right">
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => handlePostClick(post.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-4">
+            {posts.map((post) => (
+              <div key={post.id} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 h-auto font-medium text-left justify-start text-blue-600 hover:text-blue-800"
+                      onClick={() => window.open(getPostUrl(post.id), '_blank')}
+                    >
+                      <p className="truncate text-sm sm:text-base">
+                        {post.items[0]?.name || 'No item name'}
+                      </p>
+                    </Button>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Badge variant="outline" className="text-xs">
+                        {post.items[0]?.type || 'No type'}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
                         onClick={() => window.open(getPostUrl(post.id), '_blank')}
                       >
-                        <ExternalLink className="h-4 w-4" />
+                        <ExternalLink className="h-3 w-3" />
                       </Button>
                     </div>
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
-                    <Badge variant="outline">
-                      {post.items[0]?.type || 'No type'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
-                    <div className="max-w-48">
-                      <p className="truncate">
-                        {post.description || 'No description'}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-6 py-4">
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePostClick(post.id)}
+                    className="flex-shrink-0"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {post.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {post.description}
+                  </p>
+                )}
+
+                {post.local_images && post.local_images.length > 0 && (
+                  <div className="flex space-x-2 overflow-x-auto">
                     <ImageGallery
-                      images={post.local_images || []}
+                      images={post.local_images}
                       postId={post.id}
-                      maxDisplay={2}
+                      maxDisplay={3}
                     />
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-sm text-muted-foreground">
-                    {formatDateTime(post.created_time)}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-sm text-muted-foreground">
-                    {formatDateTime(post.updated_time)}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handlePostClick(post.id)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:justify-between text-xs text-muted-foreground space-y-1 sm:space-y-0">
+                  <span>Tạo: {formatDateTime(post.created_time)}</span>
+                  <span>Cập nhật: {formatDateTime(post.updated_time)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Pagination */}

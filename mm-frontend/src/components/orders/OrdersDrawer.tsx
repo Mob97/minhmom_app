@@ -288,10 +288,10 @@ export const OrdersDrawer: React.FC = () => {
       <Drawer open={isOrdersDrawerOpen} onOpenChange={setOrdersDrawerOpen}>
         <DrawerContent className="h-[80vh]">
           <DrawerHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0">
               <div className="flex-1">
-                <DrawerTitle>Đơn hàng - Post #{selectedPostId}</DrawerTitle>
-                <DrawerDescription>
+                <DrawerTitle className="text-lg sm:text-xl">Đơn hàng - Post #{selectedPostId}</DrawerTitle>
+                <DrawerDescription className="text-sm">
                   {filteredOrders.length} {t.common.order.toLowerCase()}
                 </DrawerDescription>
 
@@ -307,7 +307,7 @@ export const OrdersDrawer: React.FC = () => {
                     {post.description && (
                       <div>
                         <h4 className="text-sm font-medium text-muted-foreground mb-1">Description:</h4>
-                        <p className="text-sm">{post.description}</p>
+                        <p className="text-sm line-clamp-3">{post.description}</p>
                       </div>
                     )}
 
@@ -317,33 +317,35 @@ export const OrdersDrawer: React.FC = () => {
                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Giá nhập:</h4>
 
                          {isEditingImportPrice ? (
-                           <div className="flex items-center space-x-1">
+                           <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                              <Input
                                type="number"
                                value={importPriceValue}
                                onChange={(e) => setImportPriceValue(e.target.value)}
                                placeholder="Enter import price"
-                               className="h-8 text-sm w-48"
+                               className="h-8 text-sm w-full sm:w-48"
                              />
-                            <Button
-                              size="sm"
-                              onClick={handleSaveImportPrice}
-                              className="h-8 px-3"
-                              disabled={updatePostMutation.isPending}
-                            >
-                              {updatePostMutation.isPending ? 'Saving...' : 'Save'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCancelEditImportPrice}
-                              className="h-8 px-3"
-                            >
-                              Cancel
-                            </Button>
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={handleSaveImportPrice}
+                                className="h-8 px-3 flex-1 sm:flex-none"
+                                disabled={updatePostMutation.isPending}
+                              >
+                                {updatePostMutation.isPending ? 'Saving...' : 'Save'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCancelEditImportPrice}
+                                className="h-8 px-3 flex-1 sm:flex-none"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           </div>
                          ) : (
-                           <div className="flex items-center space-x-2">
+                           <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                              <p className="text-sm font-semibold text-green-600">
                                {post.import_price ? (
                                  new Intl.NumberFormat('vi-VN', {
@@ -358,9 +360,10 @@ export const OrdersDrawer: React.FC = () => {
                                variant="ghost"
                                size="sm"
                                onClick={handleEditImportPrice}
-                               className="h-6 px-2"
+                               className="h-6 px-2 w-fit"
                              >
-                               <Edit2 className="h-3 w-3" />
+                               <Edit2 className="h-3 w-3 mr-1" />
+                               Edit
                              </Button>
                            </div>
                          )}
@@ -369,13 +372,13 @@ export const OrdersDrawer: React.FC = () => {
 
                     {/* Post Items Management */}
                     <div>
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 mb-2">
                         <h4 className="text-sm font-medium text-muted-foreground">Sản phẩm:</h4>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setIsItemManagementModalOpen(true)}
-                          className="h-7 px-2"
+                          className="h-7 px-2 w-fit"
                         >
                           <Edit2 className="h-3 w-3 mr-1" />
                           Quản lý
@@ -384,8 +387,8 @@ export const OrdersDrawer: React.FC = () => {
                       {post.items && post.items.length > 0 ? (
                         <div className="space-y-1">
                           {post.items.map((item, index) => (
-                            <div key={index} className="flex items-center space-x-2">
-                              <Badge variant="outline">{item.name || 'Unnamed Item'}</Badge>
+                            <div key={index} className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline" className="text-xs">{item.name || 'Unnamed Item'}</Badge>
                               {item.type && <span className="text-xs text-muted-foreground">({item.type})</span>}
                               {item.prices && item.prices.length > 0 && (
                                 <span className="text-xs text-muted-foreground">
@@ -407,7 +410,7 @@ export const OrdersDrawer: React.FC = () => {
                         <ImageGallery
                           images={post.local_images}
                           postId={post.id}
-                          maxDisplay={4}
+                          maxDisplay={3}
                         />
                       </div>
                     )}
@@ -416,10 +419,10 @@ export const OrdersDrawer: React.FC = () => {
                 ) : null}
               </div>
 
-              <div className="flex flex-col items-end space-y-2 ml-4">
+              <div className="flex flex-col lg:items-end space-y-3 lg:space-y-2 lg:ml-4">
                 {/* Statistics by Type */}
                 {Object.keys(newOrdersByType).length > 0 && (
-                  <div className="text-right">
+                  <div className="lg:text-right">
                     <div className="text-sm text-muted-foreground mb-1">Đơn hàng chưa đặt:</div>
                     <div className="space-y-1">
                       {Object.entries(newOrdersByType)
@@ -435,9 +438,9 @@ export const OrdersDrawer: React.FC = () => {
 
                 {/* Revenue Display */}
                 {isAdmin && post?.import_price && (
-                  <div className="text-right">
+                  <div className="lg:text-right">
                     <div className="text-sm text-muted-foreground">Total Revenue</div>
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className="text-xl lg:text-2xl font-bold text-green-600">
                       {new Intl.NumberFormat('vi-VN', {
                         style: 'currency',
                         currency: 'VND'
@@ -447,12 +450,12 @@ export const OrdersDrawer: React.FC = () => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center space-x-2">
-                  <Button onClick={() => refetch()}>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                  <Button onClick={() => refetch()} className="w-full sm:w-auto">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     {t.common.refresh}
                   </Button>
-                  <Button onClick={handleCreateOrder}>
+                  <Button onClick={handleCreateOrder} className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     {t.posts.createOrder}
                   </Button>
@@ -462,13 +465,13 @@ export const OrdersDrawer: React.FC = () => {
 
           </DrawerHeader>
 
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto p-4 sm:p-6">
             {/* Filters */}
-            <div className="mb-4 flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                 <span className="text-sm font-medium">Lọc theo trạng thái:</span>
                 <Select value={ordersStatusFilter || "all"} onValueChange={setOrdersStatusFilter}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Tất cả trạng thái" />
                   </SelectTrigger>
                   <SelectContent>
@@ -506,81 +509,166 @@ export const OrdersDrawer: React.FC = () => {
                 <p className="text-muted-foreground text-lg">{t.posts.noOrders}</p>
               </div>
             ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t.common.user}</TableHead>
-                      <TableHead>{t.common.quantity}</TableHead>
-                      <TableHead>{t.common.type}</TableHead>
-                      <TableHead>{t.common.total}</TableHead>
-                      <TableHead>{t.common.status}</TableHead>
-                      <TableHead>Ghi chú</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOrders.map((order) => (
-                      <TableRow key={order.order_id || order.comment_id}>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden lg:block rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t.common.user}</TableHead>
+                        <TableHead>{t.common.quantity}</TableHead>
+                        <TableHead>{t.common.type}</TableHead>
+                        <TableHead>{t.common.total}</TableHead>
+                        <TableHead>{t.common.status}</TableHead>
+                        <TableHead>Ghi chú</TableHead>
+                        <TableHead className="text-right">Thao tác</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredOrders.map((order) => (
+                        <TableRow key={order.order_id || order.comment_id}>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-0 h-auto font-normal text-left justify-start truncate max-w-32"
+                                onClick={() => window.open(order.url, '_blank')}
+                              >
+                                {order.user?.name || order.user?.fb_username || 'Unknown User'}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(order.url, '_blank')}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>{t.currency.formatNumber(order.qty)}</TableCell>
+                          <TableCell>{order.type}</TableCell>
+                          <TableCell>
+                            {order.price_calc ?
+                              t.currency.format(order.price_calc.total) :
+                              '—'
+                            }
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={order.status_code || undefined}
+                              onValueChange={(value: string) => handleStatusChange(
+                                order.order_id || order.comment_id || '',
+                                value
+                              )}
+                              disabled={updateOrderStatusMutation.isPending}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statuses?.map((status) => (
+                                  <SelectItem key={status.status_code} value={status.status_code}>
+                                    {status.display_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-32 truncate" title={order.note || ''}>
+                              {order.note || '—'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end space-x-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditOrder(order)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteOrder(order)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="lg:hidden space-y-4">
+                  {filteredOrders.map((order) => (
+                    <div key={order.order_id || order.comment_id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-2">
                             <Button
                               variant="link"
                               size="sm"
-                              className="p-0 h-auto font-normal text-left justify-start truncate max-w-32"
+                              className="p-0 h-auto font-medium text-left justify-start text-blue-600 hover:text-blue-800"
                               onClick={() => window.open(order.url, '_blank')}
                             >
-                              {order.user?.name || order.user?.fb_username || 'Unknown User'}
+                              <span className="truncate text-sm sm:text-base">
+                                {order.user?.name || order.user?.fb_username || 'Unknown User'}
+                              </span>
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="h-6 w-6 p-0 flex-shrink-0"
                               onClick={() => window.open(order.url, '_blank')}
                             >
-                              <ExternalLink className="h-4 w-4" />
+                              <ExternalLink className="h-3 w-3" />
                             </Button>
                           </div>
-                        </TableCell>
-                        <TableCell>{t.currency.formatNumber(order.qty)}</TableCell>
-                        <TableCell>{order.type}</TableCell>
-                        <TableCell>
-                          {order.price_calc ?
-                            t.currency.format(order.price_calc.total) :
-                            '—'
-                          }
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={order.status_code || undefined}
-                            onValueChange={(value: string) => handleStatusChange(
-                              order.order_id || order.comment_id || '',
-                              value
+
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Số lượng:</span>
+                              <span className="font-medium">{t.currency.formatNumber(order.qty)}</span>
+                            </div>
+
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Loại:</span>
+                              <span className="font-medium">{order.type}</span>
+                            </div>
+
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Tổng cộng:</span>
+                              <span className="font-medium">
+                                {order.price_calc ?
+                                  t.currency.format(order.price_calc.total) :
+                                  '—'
+                                }
+                              </span>
+                            </div>
+
+                            {order.note && (
+                              <div>
+                                <span className="text-muted-foreground">Ghi chú:</span>
+                                <p className="text-sm mt-1 line-clamp-2">{order.note}</p>
+                              </div>
                             )}
-                            disabled={updateOrderStatusMutation.isPending}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statuses?.map((status) => (
-                                <SelectItem key={status.status_code} value={status.status_code}>
-                                  {status.display_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-32 truncate" title={order.note || ''}>
-                            {order.note || '—'}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-1">
+                        </div>
+
+                        <div className="flex flex-col items-end space-y-2">
+                          <div className="flex space-x-1">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEditOrder(order)}
+                              className="h-8 w-8 p-0"
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>
@@ -588,17 +676,39 @@ export const OrdersDrawer: React.FC = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteOrder(order)}
-                              className="text-destructive hover:text-destructive"
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Select
+                          value={order.status_code || undefined}
+                          onValueChange={(value: string) => handleStatusChange(
+                            order.order_id || order.comment_id || '',
+                            value
+                          )}
+                          disabled={updateOrderStatusMutation.isPending}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Chọn trạng thái" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statuses?.map((status) => (
+                              <SelectItem key={status.status_code} value={status.status_code}>
+                                {status.display_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </DrawerContent>

@@ -12,7 +12,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     <div className="min-h-screen bg-background">
       <TopBar />
       <NavigationTabs />
-      <main className="container mx-auto px-6 py-6">
+      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {children}
       </main>
       <Toaster />

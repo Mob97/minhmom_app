@@ -106,18 +106,18 @@ export const DashboardScreen: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bảng Điều Khiển</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bảng Điều Khiển</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Tổng quan đơn hàng và lãi năm {new Date().getFullYear()}
         </p>
       </div>
 
       {/* Yearly Overview */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Tổng Quan Năm {new Date().getFullYear()}</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Tổng Quan Năm {new Date().getFullYear()}</h2>
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Tổng Lãi</CardTitle>
@@ -189,8 +189,8 @@ export const DashboardScreen: React.FC = () => {
 
       {/* Monthly Overview */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Tổng Quan Tháng {new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Tổng Quan Tháng {new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</h2>
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Lãi Tháng Này</CardTitle>
@@ -261,7 +261,7 @@ export const DashboardScreen: React.FC = () => {
       </div>
 
       {/* Profit and Income Charts */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
           <CardTitle>Lãi Theo Tháng</CardTitle>
@@ -270,7 +270,7 @@ export const DashboardScreen: React.FC = () => {
           </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-80">
+            <div className="h-64 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dashboardData?.monthlyRevenueData || []}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -311,7 +311,7 @@ export const DashboardScreen: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-80">
+            <div className="h-64 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dashboardData?.monthlyIncomeData || []}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -347,8 +347,8 @@ export const DashboardScreen: React.FC = () => {
 
       {/* Order Status Cards */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight mb-4">Tổng Quan Trạng Thái Đơn Hàng</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight mb-3 sm:mb-4">Tổng Quan Trạng Thái Đơn Hàng</h2>
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {statusCards.map((card) => (
             <Card key={card.title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -33,20 +33,22 @@ export const TopBar: React.FC = () => {
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-6 flex h-14 items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-lg font-semibold">{t.nav.admin}</h1>
-          {getEnvironmentBadge()}
+      <div className="container mx-auto px-4 sm:px-6 flex h-14 items-center justify-between">
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <h1 className="text-base sm:text-lg font-semibold">{t.nav.admin}</h1>
+          <div className="hidden sm:block">
+            {getEnvironmentBadge()}
+          </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <div className="hidden md:flex items-center space-x-2">
             <span className="text-sm text-muted-foreground">Group ID:</span>
             <Badge variant="outline">{selectedGroupId}</Badge>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
+          <div className="flex items-center space-x-1 sm:space-x-2">
+            <Button variant="ghost" size="sm" className="hidden sm:flex">
               <Settings className="h-4 w-4" />
             </Button>
 

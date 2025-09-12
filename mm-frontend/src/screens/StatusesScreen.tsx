@@ -119,21 +119,21 @@ export const StatusesScreen: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h2 className="text-2xl font-bold">{t.statuses.title}</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-bold">{t.statuses.title}</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             {filteredStatuses.length} {t.statuses.title.toLowerCase()}
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button onClick={() => refetch()}>
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+          <Button onClick={() => refetch()} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             {t.common.refresh}
           </Button>
-          <Button onClick={() => setCreateStatusModalOpen(true)}>
+          <Button onClick={() => setCreateStatusModalOpen(true)} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             {t.statuses.createStatus}
           </Button>
