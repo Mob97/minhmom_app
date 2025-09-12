@@ -11,6 +11,7 @@ import { RefreshCw, Plus, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
 import { DeleteOrderDialog } from './DeleteOrderDialog';
+import { ItemManagementModal } from './ItemManagementModal';
 import { useToast } from '@/hooks/use-toast';
 import { useUpdateOrderStatus, useUpdateOrder, useCreateOrder, useDeleteOrder } from '@/hooks/use-api';
 import { ImageGallery } from '@/components/ui/image-gallery';
@@ -55,6 +56,7 @@ export const OrdersDrawer: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDeleteOrderDialogOpen, setIsDeleteOrderDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [isItemManagementModalOpen, setIsItemManagementModalOpen] = useState(false);
 
   const filteredOrders = orders?.filter(order =>
     !ordersStatusFilter || ordersStatusFilter === "all" || order.status_code === ordersStatusFilter
@@ -254,6 +256,29 @@ export const OrdersDrawer: React.FC = () => {
     }
   };
 
+  const handleSaveItems = async (items: any[]) => {
+    if (!selectedGroupId || !selectedPostId) return;
+
+    try {
+      await updatePostMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: selectedPostId,
+        data: { items }
+      });
+      toast({
+        title: 'Success',
+        description: 'Items updated successfully',
+      });
+      setIsItemManagementModalOpen(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.detail || 'Failed to update items',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (!selectedPostId) {
     return null;
   }
@@ -342,20 +367,38 @@ export const OrdersDrawer: React.FC = () => {
                        </div>
                      )}
 
-                    {/* Post Items */}
-                    {post.items && post.items.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Items:</h4>
+                    {/* Post Items Management */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-medium text-muted-foreground">Sản phẩm:</h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsItemManagementModalOpen(true)}
+                          className="h-7 px-2"
+                        >
+                          <Edit2 className="h-3 w-3 mr-1" />
+                          Quản lý
+                        </Button>
+                      </div>
+                      {post.items && post.items.length > 0 ? (
                         <div className="space-y-1">
                           {post.items.map((item, index) => (
                             <div key={index} className="flex items-center space-x-2">
                               <Badge variant="outline">{item.name || 'Unnamed Item'}</Badge>
                               {item.type && <span className="text-xs text-muted-foreground">({item.type})</span>}
+                              {item.prices && item.prices.length > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {item.prices.length} giá
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Chưa có sản phẩm nào</p>
+                      )}
+                    </div>
 
                     {/* Post Images */}
                     {post.local_images && post.local_images.length > 0 && (
@@ -582,6 +625,14 @@ export const OrdersDrawer: React.FC = () => {
         order={orderToDelete}
         onConfirm={handleConfirmDeleteOrder}
         loading={deleteOrderMutation.isPending}
+      />
+
+      <ItemManagementModal
+        open={isItemManagementModalOpen}
+        onOpenChange={setIsItemManagementModalOpen}
+        items={post?.items || []}
+        onSave={handleSaveItems}
+        loading={updatePostMutation.isPending}
       />
     </>
   );

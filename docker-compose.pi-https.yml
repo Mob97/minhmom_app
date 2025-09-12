@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Backend service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.arm64  # ARM-specific Dockerfile
+    container_name: minhmom-backend
+    volumes:
+      - /home/minhbq/minhmom/images:/app/images
+      - ./backend/config.prod.yaml:/app/config.yaml
+    environment:
+      - MONGODB_URI=${MONGODB_URI:-mongodb://root:change-me@192.168.100.232:27017/}
+      - DB_NAME=${DB_NAME:-minhmom}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - minhmom-network
+
+  # Frontend service with HTTPS
+  frontend:
+    build:
+      context: ./mm-frontend
+      dockerfile: Dockerfile.arm64  # ARM-specific Dockerfile
+    container_name: minhmom-frontend
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://localhost/api}
+      - VITE_GROUP_ID=${VITE_GROUP_ID:-2847737995453663}
+    volumes:
+      - ./mm-frontend/nginx-https.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./certbot/www:/var/www/certbot:ro
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - minhmom-network
+
+  # Certbot for Let's Encrypt SSL certificates
+  certbot:
+    image: certbot/certbot:latest
+    container_name: minhmom-certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+      - ./ssl:/etc/nginx/ssl
+    command: certonly --webroot --webroot-path=/var/www/certbot --email ${SSL_EMAIL:-admin@example.com} --agree-tos --no-eff-email -d ${SSL_DOMAIN:-localhost}
+    depends_on:
+      - frontend
+    networks:
+      - minhmom-network
+
+networks:
+  minhmom-network:
+    driver: bridge
+
+volumes:
+  images:
+    driver: local
+  ssl-certs:
+    driver: local
+
+
