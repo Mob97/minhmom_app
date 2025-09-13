@@ -35,11 +35,10 @@ services:
       - SSL_DOMAIN=${SSL_DOMAIN:-minhmom.ddns.net}
       - SSL_EMAIL=${SSL_EMAIL:-admin@example.com}
     volumes:
-      - ./mm-frontend/nginx-https.conf:/etc/nginx/nginx.conf:ro
+      - ./mm-frontend/nginx-https-fixed.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
-      - ./scripts/init-ssl.sh:/usr/local/bin/init-ssl.sh:ro
     restart: unless-stopped
     depends_on:
       - backend
@@ -48,7 +47,6 @@ services:
       - "443:443"
     networks:
       - minhmom-network
-    command: ["/bin/sh", "-c", "chmod +x /usr/local/bin/init-ssl.sh && /usr/local/bin/init-ssl.sh"]
 
   # Certbot for Let's Encrypt SSL certificates
   certbot:
