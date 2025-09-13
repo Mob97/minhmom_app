@@ -32,10 +32,14 @@ services:
     environment:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://localhost/api}
       - VITE_GROUP_ID=${VITE_GROUP_ID:-2847737995453663}
+      - SSL_DOMAIN=${SSL_DOMAIN:-minhmom.ddns.net}
+      - SSL_EMAIL=${SSL_EMAIL:-admin@example.com}
     volumes:
       - ./mm-frontend/nginx-https.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-      - ./certbot/www:/var/www/certbot:ro
+      - ./ssl:/etc/nginx/ssl
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+      - ./scripts/init-ssl.sh:/usr/local/bin/init-ssl.sh:ro
     restart: unless-stopped
     depends_on:
       - backend
@@ -44,6 +48,7 @@ services:
       - "443:443"
     networks:
       - minhmom-network
+    command: ["/bin/sh", "-c", "chmod +x /usr/local/bin/init-ssl.sh && /usr/local/bin/init-ssl.sh"]
 
   # Certbot for Let's Encrypt SSL certificates
   certbot:
