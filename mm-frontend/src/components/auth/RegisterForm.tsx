@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { getTranslation } from '@/lib/i18n';
 
 interface RegisterFormProps {
   onSwitchToLogin?: () => void;
@@ -22,8 +23,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
     e.preventDefault();
     if (!username || !password || !confirmPassword) {
       toast({
-        title: 'Error',
-        description: 'Please fill in all fields',
+        title: getTranslation('common.error'),
+        description: getTranslation('auth.fillAllFields'),
         variant: 'destructive',
       });
       return;
@@ -31,8 +32,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
 
     if (password !== confirmPassword) {
       toast({
-        title: 'Error',
-        description: 'Passwords do not match',
+        title: getTranslation('common.error'),
+        description: getTranslation('auth.passwordsNotMatch'),
         variant: 'destructive',
       });
       return;
@@ -40,8 +41,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
 
     if (password.length < 6) {
       toast({
-        title: 'Error',
-        description: 'Password must be at least 6 characters long',
+        title: getTranslation('common.error'),
+        description: getTranslation('validation.minLength', { min: 6 }),
         variant: 'destructive',
       });
       return;
@@ -51,16 +52,16 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
     try {
       await register({ username, password, role: 'user' });
       toast({
-        title: 'Success',
-        description: 'Account created successfully. Please login.',
+        title: getTranslation('common.success'),
+        description: getTranslation('auth.registerSuccess'),
       });
       if (onSwitchToLogin) {
         onSwitchToLogin();
       }
     } catch (error: any) {
       toast({
-        title: 'Registration Failed',
-        description: error.detail || 'Failed to create account',
+        title: getTranslation('auth.registerFailed'),
+        description: error.detail || getTranslation('auth.registerFailed'),
         variant: 'destructive',
       });
     } finally {
@@ -71,46 +72,46 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Register</CardTitle>
-        <CardDescription>Create a new account to access the system</CardDescription>
+        <CardTitle>{getTranslation('auth.registerTitle')}</CardTitle>
+        <CardDescription>{getTranslation('auth.registerDescription')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username">{getTranslation('auth.username')}</Label>
             <Input
               id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              placeholder={getTranslation('auth.enterUsername')}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{getTranslation('auth.password')}</Label>
             <Input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={getTranslation('auth.enterPassword')}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword">{getTranslation('auth.confirmPassword')}</Label>
             <Input
               id="confirmPassword"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your password"
+              placeholder={getTranslation('auth.enterConfirmPassword')}
               required
             />
           </div>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? 'Creating Account...' : 'Register'}
+            {isLoading ? getTranslation('auth.registering') : getTranslation('auth.register')}
           </Button>
           {onSwitchToLogin && (
             <div className="text-center">
@@ -120,7 +121,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
                 onClick={onSwitchToLogin}
                 className="text-sm"
               >
-                Already have an account? Login
+                {getTranslation('auth.haveAccount')}
               </Button>
             </div>
           )}
