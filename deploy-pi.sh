@@ -149,9 +149,20 @@ deploy() {
 
     # Check if HTTPS is requested
     if [ "$2" = "https" ] || [ "$2" = "--https" ]; then
-        compose_file="docker-compose.pi-https.yml"
         use_https=true
         print_status "HTTPS deployment mode enabled"
+        print_status "Running complete HTTPS deployment script..."
+
+        # Run the complete HTTPS deployment script
+        if [ -f "deploy-https-complete.sh" ]; then
+            chmod +x deploy-https-complete.sh
+            ./deploy-https-complete.sh
+            return 0
+        else
+            print_error "deploy-https-complete.sh not found"
+            print_error "Please ensure the complete HTTPS deployment script is available"
+            exit 1
+        fi
     fi
 
     print_status "Starting MinhMom application deployment on Raspberry Pi..."
@@ -194,18 +205,9 @@ deploy() {
     PI_IP=$(hostname -I | awk '{print $1}')
 
     print_status "Deployment completed successfully!"
-
-    if [ "$use_https" = true ]; then
-        print_pi "Frontend: https://$PI_IP"
-        print_pi "Backend API: https://$PI_IP/api"
-        print_pi "API Documentation: https://$PI_IP/api/docs"
-        print_status "HTTPS enabled with automatic HTTP to HTTPS redirect"
-    else
-        print_pi "Frontend: http://$PI_IP"
-        print_pi "Backend API: http://$PI_IP:8000"
-        print_pi "API Documentation: http://$PI_IP:8000/docs"
-    fi
-
+    print_pi "Frontend: http://$PI_IP"
+    print_pi "Backend API: http://$PI_IP:8000"
+    print_pi "API Documentation: http://$PI_IP:8000/docs"
     print_status "Access from other devices using the Pi's IP address"
 }
 
