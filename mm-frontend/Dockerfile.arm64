@@ -13,6 +13,12 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Set build-time environment variables
+ARG VITE_API_BASE_URL=https://minhmom.ddns.net/api
+ARG VITE_GROUP_ID=2847737995453663
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_GROUP_ID=$VITE_GROUP_ID
+
 # Build the application
 RUN npm run build
 

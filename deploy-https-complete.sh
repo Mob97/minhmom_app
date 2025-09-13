@@ -203,7 +203,7 @@ wait_for_services() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if curl -f http://localhost:8000/health &> /dev/null; then
+        if docker exec minhmom-backend curl -f http://localhost:8000/health &> /dev/null; then
             print_status "Backend is ready ✓"
             break
         fi
@@ -235,7 +235,7 @@ get_letsencrypt_certs() {
     sleep 10
 
     # Try to get certificates
-    docker-compose -f docker-compose.pi-https.yml run --rm certbot certbot certonly \
+    docker-compose -f docker-compose.pi-https.yml run --rm certbot certonly \
         --webroot \
         --webroot-path=/var/www/certbot \
         --email ${SSL_EMAIL:-admin@example.com} \
@@ -252,10 +252,13 @@ get_letsencrypt_certs() {
     }
 
     # Copy Let's Encrypt certificates to ssl directory
-    if [ -f "certbot/conf/live/${SSL_DOMAIN:-minhmom.ddns.net}/fullchain.pem" ]; then
+    if sudo test -f "certbot/conf/live/${SSL_DOMAIN:-minhmom.ddns.net}/fullchain.pem"; then
         print_status "Installing Let's Encrypt certificates..."
-        cp certbot/conf/live/${SSL_DOMAIN:-minhmom.ddns.net}/fullchain.pem ssl/cert.pem
-        cp certbot/conf/live/${SSL_DOMAIN:-minhmom.ddns.net}/privkey.pem ssl/key.pem
+        sudo cp certbot/conf/live/${SSL_DOMAIN:-minhmom.ddns.net}/fullchain.pem ssl/cert.pem
+        sudo cp certbot/conf/live/${SSL_DOMAIN:-minhmom.ddns.net}/privkey.pem ssl/key.pem
+
+        # Change ownership to current user
+        sudo chown $(id -u):$(id -g) ssl/cert.pem ssl/key.pem
 
         # Restart nginx with new certificates
         docker-compose -f docker-compose.pi-https.yml restart frontend
@@ -263,8 +266,20 @@ get_letsencrypt_certs() {
         print_status "Let's Encrypt certificates installed ✓"
         return 0
     else
-        print_warning "Let's Encrypt certificates not found"
-        return 1
+        # Try to copy certificates from the certbot container
+        print_status "Copying certificates from certbot container..."
+        if docker cp minhmom-certbot:/etc/letsencrypt/live/${SSL_DOMAIN:-minhmom.ddns.net}/fullchain.pem ssl/cert.pem 2>/dev/null && \
+           docker cp minhmom-certbot:/etc/letsencrypt/live/${SSL_DOMAIN:-minhmom.ddns.net}/privkey.pem ssl/key.pem 2>/dev/null; then
+            print_status "Let's Encrypt certificates copied from container ✓"
+
+            # Restart nginx with new certificates
+            docker-compose -f docker-compose.pi-https.yml restart frontend
+
+            return 0
+        else
+            print_warning "Let's Encrypt certificates not found"
+            return 1
+        fi
     fi
 }
 

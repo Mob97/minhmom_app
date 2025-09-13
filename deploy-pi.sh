@@ -155,7 +155,7 @@ deploy() {
 
         # Run the complete HTTPS deployment script
         if [ -f "deploy-https-complete.sh" ]; then
-            chmod +x deploy-https-complete.sh
+            # chmod +x deploy-https-complete.sh
             ./deploy-https-complete.sh
             return 0
         else

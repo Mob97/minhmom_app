@@ -36,6 +36,20 @@ services:
       - backend
     network_mode: "host"
 
+    # Certbot for Let's Encrypt SSL certificates
+  certbot:
+    image: certbot/certbot:latest
+    container_name: minhmom-certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+      - ./ssl:/etc/nginx/ssl
+    command: certonly --webroot --webroot-path=/var/www/certbot --email ${SSL_EMAIL:-admin@example.com} --agree-tos --no-eff-email -d ${SSL_DOMAIN:-localhost}
+    depends_on:
+      - frontend
+    networks:
+      - minhmom-network
+
 networks:
   minhmom-network:
     driver: bridge

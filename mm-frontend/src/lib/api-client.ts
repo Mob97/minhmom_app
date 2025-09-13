@@ -107,7 +107,7 @@ export const authApi = {
 // Status API
 export const statusApi = {
   getAll: async (params?: StatusQueryParams): Promise<Status[]> => {
-    const response: AxiosResponse<Status[]> = await apiClient.get('/statuses', { params });
+    const response: AxiosResponse<Status[]> = await apiClient.get('/statuses/', { params });
     return response.data;
   },
 
@@ -134,7 +134,7 @@ export const statusApi = {
 // User API
 export const userApi = {
   getAll: async (params?: UserQueryParams): Promise<PaginatedResponse<User>> => {
-    const response: AxiosResponse<PaginatedResponse<User>> = await apiClient.get('/users', { params });
+    const response: AxiosResponse<PaginatedResponse<User>> = await apiClient.get('/users/', { params });
     return response.data;
   },
 
@@ -188,7 +188,7 @@ export const userApi = {
 export const postApi = {
   getAll: async (groupId: string, params?: PostQueryParams): Promise<PaginatedResponse<Post>> => {
     const response: AxiosResponse<PaginatedResponse<Post>> = await apiClient.get(
-      `/groups/${groupId}/posts`,
+      `/groups/${groupId}/posts/`,
       { params }
     );
     return response.data;
