@@ -97,6 +97,8 @@ check_env() {
         print_status "Important settings for Raspberry Pi:"
         print_status "  MONGODB_URI=mongodb://localhost:27017  # or your external MongoDB"
         print_status "  VITE_API_BASE_URL=http://<pi-ip>:8000  # replace <pi-ip> with your Pi's IP"
+        print_status "  SSL_DOMAIN=your-domain.com  # for HTTPS deployment"
+        print_status "  SSL_EMAIL=admin@your-domain.com  # for Let's Encrypt"
         exit 1
     fi
 }
@@ -142,15 +144,26 @@ EOF
 
 # Build and start services
 deploy() {
+    local compose_file="docker-compose.pi.yml"
+    local use_https=false
+
+    # Check if HTTPS is requested
+    if [ "$2" = "https" ] || [ "$2" = "--https" ]; then
+        compose_file="docker-compose.pi-https.yml"
+        use_https=true
+        print_status "HTTPS deployment mode enabled"
+    fi
+
     print_status "Starting MinhMom application deployment on Raspberry Pi..."
 
     # Stop existing containers
     print_status "Stopping existing containers..."
     docker-compose -f docker-compose.pi.yml down 2>/dev/null || true
+    docker-compose -f docker-compose.pi-https.yml down 2>/dev/null || true
 
     # Build and start services
     print_status "Building and starting services..."
-    docker-compose -f docker-compose.pi.yml up --build -d
+    docker-compose -f $compose_file up --build -d
 
     # Wait for services to be healthy
     print_status "Waiting for services to be ready..."
@@ -164,7 +177,7 @@ deploy() {
         print_status "Backend is healthy ✓"
     else
         print_error "Backend health check failed"
-        docker-compose -f docker-compose.pi.yml logs backend
+        docker-compose -f $compose_file logs backend
         exit 1
     fi
 
@@ -173,7 +186,7 @@ deploy() {
         print_status "Frontend is healthy ✓"
     else
         print_error "Frontend health check failed"
-        docker-compose -f docker-compose.pi.yml logs frontend
+        docker-compose -f $compose_file logs frontend
         exit 1
     fi
 
@@ -181,27 +194,51 @@ deploy() {
     PI_IP=$(hostname -I | awk '{print $1}')
 
     print_status "Deployment completed successfully!"
-    print_pi "Frontend: http://$PI_IP"
-    print_pi "Backend API: http://$PI_IP:8000"
-    print_pi "API Documentation: http://$PI_IP:8000/docs"
+
+    if [ "$use_https" = true ]; then
+        print_pi "Frontend: https://$PI_IP"
+        print_pi "Backend API: https://$PI_IP/api"
+        print_pi "API Documentation: https://$PI_IP/api/docs"
+        print_status "HTTPS enabled with automatic HTTP to HTTPS redirect"
+    else
+        print_pi "Frontend: http://$PI_IP"
+        print_pi "Backend API: http://$PI_IP:8000"
+        print_pi "API Documentation: http://$PI_IP:8000/docs"
+    fi
+
     print_status "Access from other devices using the Pi's IP address"
 }
 
 # Stop services
 stop() {
     print_status "Stopping MinhMom application..."
-    docker-compose -f docker-compose.pi.yml down
+    docker-compose -f docker-compose.pi.yml down 2>/dev/null || true
+    docker-compose -f docker-compose.pi-https.yml down 2>/dev/null || true
     print_status "Application stopped."
 }
 
 # Show logs
 logs() {
-    docker-compose -f docker-compose.pi.yml logs -f
+    local compose_file="docker-compose.pi.yml"
+
+    # Check if HTTPS is requested
+    if [ "$2" = "https" ] || [ "$2" = "--https" ]; then
+        compose_file="docker-compose.pi-https.yml"
+    fi
+
+    docker-compose -f $compose_file logs -f
 }
 
 # Show status
 status() {
-    docker-compose -f docker-compose.pi.yml ps
+    local compose_file="docker-compose.pi.yml"
+
+    # Check if HTTPS is requested
+    if [ "$2" = "https" ] || [ "$2" = "--https" ]; then
+        compose_file="docker-compose.pi-https.yml"
+    fi
+
+    docker-compose -f $compose_file ps
     echo ""
     print_status "System Resources:"
     free -h
@@ -227,6 +264,47 @@ pi_info() {
     fi
 }
 
+# SSL certificate management
+ssl_cert() {
+    local action="${2:-status}"
+
+    case "$action" in
+        status)
+            print_status "Checking SSL certificate status..."
+            if [ -f "ssl/cert.pem" ]; then
+                print_status "SSL certificate found:"
+                openssl x509 -in ssl/cert.pem -text -noout | grep -E "(Subject:|Not Before:|Not After:|Issuer:)"
+            else
+                print_warning "No SSL certificate found"
+            fi
+            ;;
+        renew)
+            print_status "Renewing SSL certificate..."
+            docker-compose -f docker-compose.pi-https.yml exec certbot certbot renew
+            docker-compose -f docker-compose.pi-https.yml restart frontend
+            print_status "SSL certificate renewed"
+            ;;
+        create)
+            print_status "Creating SSL certificate..."
+            if [ -z "$SSL_DOMAIN" ] || [ -z "$SSL_EMAIL" ]; then
+                print_error "SSL_DOMAIN and SSL_EMAIL must be set in .env file"
+                exit 1
+            fi
+            docker-compose -f docker-compose.pi-https.yml run --rm certbot certbot certonly --webroot --webroot-path=/var/www/certbot --email $SSL_EMAIL --agree-tos --no-eff-email -d $SSL_DOMAIN
+            print_status "SSL certificate created"
+            ;;
+        *)
+            echo "Usage: $0 ssl-cert {status|renew|create}"
+            echo ""
+            echo "SSL Certificate Commands:"
+            echo "  status  - Show current certificate status"
+            echo "  renew   - Renew existing certificate"
+            echo "  create  - Create new certificate (requires SSL_DOMAIN and SSL_EMAIL in .env)"
+            exit 1
+            ;;
+    esac
+}
+
 # Main script logic
 case "${1:-deploy}" in
     deploy)
@@ -235,16 +313,16 @@ case "${1:-deploy}" in
         check_docker
         check_env
         optimize_system
-        deploy
+        deploy "$@"
         ;;
     stop)
         stop
         ;;
     logs)
-        logs
+        logs "$@"
         ;;
     status)
-        status
+        status "$@"
         ;;
     restart)
         stop
@@ -252,21 +330,36 @@ case "${1:-deploy}" in
         check_pi
         check_docker
         check_env
-        deploy
+        deploy "$@"
         ;;
     info)
         pi_info
         ;;
+    ssl-cert)
+        ssl_cert "$@"
+        ;;
     *)
-        echo "Usage: $0 {deploy|stop|logs|status|restart|info}"
+        echo "Usage: $0 {deploy|stop|logs|status|restart|info|ssl-cert} [https|--https]"
         echo ""
         echo "Commands:"
-        echo "  deploy   - Build and start the application (default)"
-        echo "  stop     - Stop the application"
-        echo "  logs     - Show application logs"
-        echo "  status   - Show container status and system resources"
-        echo "  restart  - Restart the application"
-        echo "  info     - Show Raspberry Pi information"
+        echo "  deploy [https]   - Build and start the application (default: HTTP)"
+        echo "  stop             - Stop the application"
+        echo "  logs [https]     - Show application logs"
+        echo "  status [https]   - Show container status and system resources"
+        echo "  restart [https]  - Restart the application"
+        echo "  info             - Show Raspberry Pi information"
+        echo "  ssl-cert         - Manage SSL certificates"
+        echo ""
+        echo "HTTPS Options:"
+        echo "  https, --https   - Enable HTTPS with Let's Encrypt SSL certificates"
+        echo ""
+        echo "Examples:"
+        echo "  $0 deploy                    # Deploy with HTTP"
+        echo "  $0 deploy https              # Deploy with HTTPS"
+        echo "  $0 logs https                # View HTTPS deployment logs"
+        echo "  $0 status https              # Check HTTPS deployment status"
+        echo "  $0 ssl-cert status           # Check SSL certificate status"
+        echo "  $0 ssl-cert renew            # Renew SSL certificate"
         exit 1
         ;;
 esac
