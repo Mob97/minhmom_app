@@ -27,14 +27,19 @@ print_error() {
 fix_ssl_certificates() {
     print_status "Creating SSL directory and certificates..."
 
-    # Create SSL directory
+    # Create SSL directory with proper permissions
     mkdir -p ssl
+    chmod 755 ssl
 
     # Generate self-signed certificate
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout ssl/key.pem \
         -out ssl/cert.pem \
         -subj "/C=US/ST=State/L=City/O=Organization/CN=minhmom.ddns.net"
+
+    # Set proper permissions for certificates
+    chmod 644 ssl/cert.pem
+    chmod 600 ssl/key.pem
 
     print_status "SSL certificates created ✓"
 }
@@ -45,6 +50,11 @@ create_certbot_dirs() {
 
     mkdir -p certbot/www
     mkdir -p certbot/conf
+
+    # Set proper permissions
+    chmod 755 certbot
+    chmod 755 certbot/www
+    chmod 755 certbot/conf
 
     print_status "Certbot directories created ✓"
 }
