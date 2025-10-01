@@ -161,11 +161,62 @@ class PostOut(BaseModel):
 # Order models (nested in post)
 # =========================
 
+# New order structure schemas
+class OrderSource(BaseModel):
+    comment_id: Optional[str] = None
+    comment_url: Optional[str] = None
+    comment_text: Optional[str] = None
+    comment_created_time: Optional[str] = None
+
+
+class OrderCustomer(BaseModel):
+    fb_uid: Optional[str] = None
+    fb_username: Optional[str] = None
+    name: Optional[str] = None
+    fb_url: Optional[str] = None
+    created_date: Optional[str] = None
+    addresses: List[str] = Field(default_factory=list)
+    address: Optional[str] = None
+    phone_number: Optional[str] = None
+    avatar_url: Optional[str] = None
+    note: Optional[str] = None
+
+
+class OrderDeliveryInfo(BaseModel):
+    name: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+
+
+class OrderItem(BaseModel):
+    item_id: Optional[int] = None
+    item_name: Optional[str] = None
+    item_type: Optional[str] = None
+    unit_price: Optional[float] = None
+    qty: Optional[float] = None
+    total_price: Optional[float] = None
+    price_calculation: Optional[PriceCalc] = None
+
+
+class OrderStatusHistory(BaseModel):
+    status: str
+    note: Optional[str] = None
+    actor: Optional[str] = None
+    at: str
+
+
 class OrderIn(BaseModel):
     """
     Create a new order inside a post.
     Server trusts client-supplied price_calc (already computed).
     """
+    # New structured fields
+    source: Optional[OrderSource] = None
+    customer: Optional[OrderCustomer] = None
+    delivery_info: Optional[OrderDeliveryInfo] = None
+    item: Optional[OrderItem] = None
+
+    # Legacy fields for backward compatibility
     comment_id: Optional[str] = None
     comment_url: Optional[str] = None
     comment_text: Optional[str] = None
@@ -179,6 +230,10 @@ class OrderIn(BaseModel):
     matched_item: Optional[Item] = None     # optional, if you preselect an item
     price_calc: Optional[PriceCalc] = None  # precomputed pricing
 
+    # Price fields for manual price setting
+    unit_price: Optional[float] = None
+    total_price: Optional[float] = None
+
     status_code: str = "NEW"
     note: Optional[str] = None
     user: Optional[OrderUserOut] = None
@@ -186,27 +241,32 @@ class OrderIn(BaseModel):
 
 class OrderOut(BaseModel):
     order_id: str
+    parsed_at: Optional[str] = None
+    currency: str
+    raw_url: Optional[str] = None
+
+    # New structured fields
+    source: Optional[OrderSource] = None
+    customer: Optional[OrderCustomer] = None
+    delivery_info: Optional[OrderDeliveryInfo] = None
+    item: Optional[OrderItem] = None
+
+    status_code: str
+    status_history: List[OrderStatusHistory] = Field(default_factory=list)
+    note: Optional[str] = None
+
+    # Legacy fields for backward compatibility
     comment_id: Optional[str] = None
     comment_url: Optional[str] = None
     comment_text: Optional[str] = None
     comment_created_time: Optional[str] = None
-
-    url: str
-    raw_url: Optional[str] = None
-    qty: float
+    url: Optional[str] = None
+    qty: Optional[float] = None
     type: Optional[str] = None
-    currency: str
-
     matched_item: Optional[Item] = None
     price_calc: Optional[PriceCalc] = None
-
-    status_code: str
-    status_history: List[dict] = Field(default_factory=list)
-    parsed_at: Optional[str] = None
-    source: Optional[str] = None
     user: Optional[OrderUserOut] = None
     address: Optional[str] = None
-    note: Optional[str] = None
 
 
 class OrderStatusPatch(BaseModel):

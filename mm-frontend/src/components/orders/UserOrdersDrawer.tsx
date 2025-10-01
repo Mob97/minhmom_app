@@ -16,6 +16,15 @@ import { useToast } from '@/hooks/use-toast';
 import { EditOrderModal } from './EditOrderModal';
 import { DeleteOrderDialog } from './DeleteOrderDialog';
 import type { Order } from '@/types/api';
+import {
+  getOrderQuantity,
+  getOrderType,
+  getOrderTotalPrice,
+  getOrderPriceCalc,
+  getOrderCommentUrl,
+  getOrderCommentCreatedTime,
+  getOrderCommentId
+} from '@/types/api';
 
 interface UserOrdersDrawerProps {
   showAllOrders?: boolean;
@@ -151,7 +160,7 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
 
     // Calculate total amount
     const totalAmount = selectedOrdersData.reduce((sum, orderData) => {
-      return sum + (orderData.order?.price_calc?.total || 0);
+      return sum + getOrderTotalPrice(orderData.order);
     }, 0);
 
     // Create print content
@@ -256,16 +265,16 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
           <tbody>
             ${selectedOrdersData.map((orderData: { order: Order; post_id: string; post_description: string }, index: number) => {
               const order = orderData.order;
-              const total = order?.price_calc?.total || 0;
-              const qty = order?.qty || 0;
+              const total = getOrderTotalPrice(order);
+              const qty = getOrderQuantity(order);
               const unitPrice = qty > 0 ? total / qty : 0;
 
               return `
                 <tr>
                   <td>${index + 1}</td>
-                  <td>${order?.matched_item?.name || '—'}</td>
+                  <td>${order?.item?.item_name || order?.matched_item?.name || '—'}</td>
                   <td>${qty}</td>
-                  <td>${order?.type || '—'}</td>
+                  <td>${getOrderType(order)}</td>
                   <td>${formatCurrency(unitPrice)}</td>
                   <td>${formatCurrency(total)}</td>
                   <td>${getStatusDisplayName(order?.status_code || '')}</td>
@@ -503,7 +512,7 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
       await updateOrderMutation.mutateAsync({
         groupId: selectedGroupId,
         postId: orderData.post_id,
-        orderId: selectedOrder.order_id || selectedOrder.comment_id || '',
+        orderId: selectedOrder.order_id || getOrderCommentId(selectedOrder) || '',
         data
       });
       toast({
@@ -777,24 +786,24 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                           </TableCell>
                           <TableCell className="w-48">
                             <div className="truncate">
-                              {order?.matched_item?.name ? (
+                              {(order?.item?.item_name || order?.matched_item?.name) ? (
                                 <Button
                                   variant="link"
                                   size="sm"
                                   className="p-0 h-auto text-left justify-start truncate"
-                                  onClick={() => window.open(order?.comment_url || '#', '_blank')}
+                                  onClick={() => window.open(getOrderCommentUrl(order) || '#', '_blank')}
                                 >
-                                  {order.matched_item.name}
+                                  {order?.item?.item_name || order?.matched_item?.name}
                                 </Button>
                               ) : (
                                 '—'
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="w-20">{order?.qty || '—'}</TableCell>
-                          <TableCell>{order?.type || '—'}</TableCell>
+                          <TableCell className="w-20">{getOrderQuantity(order)}</TableCell>
+                          <TableCell>{getOrderType(order)}</TableCell>
                           <TableCell className="w-24">
-                            {order?.price_calc?.total ? formatCurrency(order.price_calc.total) : '—'}
+                            {getOrderPriceCalc(order) ? formatCurrency(getOrderTotalPrice(order)) : '—'}
                           </TableCell>
                           <TableCell className="w-48">
                             <Select
@@ -821,7 +830,7 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                           </TableCell>
                           <TableCell className="w-32">
                             <div className="text-xs">
-                              {formatDateTime(order?.comment_created_time)}
+                              {formatDateTime(getOrderCommentCreatedTime(order))}
                             </div>
                           </TableCell>
                           <TableCell className="text-right w-20">

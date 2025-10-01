@@ -114,7 +114,10 @@ async def get_dashboard_data(
         # Only calculate revenue and income for non-CANCELLED orders with available import_price
         if status != "CANCELLED":
             order_total = 0
-            if order.get("price_calc") and order["price_calc"].get("total"):
+            # Use new structure total_price if available, otherwise fall back to legacy price_calc
+            if order.get("item") and order["item"].get("total_price"):
+                order_total = order["item"]["total_price"]
+            elif order.get("price_calc") and order["price_calc"].get("total"):
                 order_total = order["price_calc"]["total"]
 
             post_id = order.get("post_id")

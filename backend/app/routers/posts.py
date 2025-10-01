@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from ..db import get_db, posts_col, statuses_col
 from ..schemas import PostPatch, PostOut, OrderIn, OrderOut, OrderStatusPatch, PaginatedResponse
 from ..auth import require_user_or_admin
-from ..utils import to_local_time, pick_item_for_comment, compute_min_cost
+from ..utils import to_local_time, compute_min_cost
 import hashlib
 import os
 import math
@@ -338,8 +338,23 @@ async def list_orders(
     for o in orders:
         # Convert parsed_at to local time string
         o["parsed_at"] = to_local_time(o.get("parsed_at"))
-        # Convert comment_created_time to local time string
+
+        # Convert legacy comment_created_time to local time string
         o["comment_created_time"] = to_local_time(o.get("comment_created_time"))
+
+        # Convert new structure datetime fields to strings
+        if "source" in o and o["source"]:
+            if "comment_created_time" in o["source"]:
+                o["source"]["comment_created_time"] = to_local_time(o["source"]["comment_created_time"])
+
+        if "customer" in o and o["customer"]:
+            if "created_date" in o["customer"]:
+                o["customer"]["created_date"] = to_local_time(o["customer"]["created_date"])
+
+        if "status_history" in o and o["status_history"]:
+            for status_entry in o["status_history"]:
+                if "at" in status_entry:
+                    status_entry["at"] = to_local_time(status_entry["at"])
         out.append(OrderOut(**o))
     return out
 
@@ -362,10 +377,11 @@ async def create_order(
     if not post:
         raise HTTPException(404, "Post not found")
 
-    # 3) Prevent duplicate by comment_id
-    if body.comment_id:
+    # 3) Prevent duplicate by comment_id (check both new and legacy structures)
+    comment_id = body.source.comment_id if body.source else body.comment_id
+    if comment_id:
         dup = await posts_col(db, group_id).find_one(
-            {"_id": post_id, "orders.comment_id": body.comment_id}, {"_id": 1}
+            {"_id": post_id, "orders.comment_id": comment_id}, {"_id": 1}
         )
         if dup:
             raise HTTPException(409, "Order with this comment_id already exists")
@@ -375,56 +391,107 @@ async def create_order(
     if not items:
         raise HTTPException(400, "Post has no items for price calculation")
 
-    # 5) Pick the best item based on type
-    chosen_item = pick_item_for_comment(items, body.type)
+    # 5) Determine item type and quantity (support both new and legacy structures)
+    item_type = body.item.item_type if body.item else body.type
+    item_qty = body.item.qty if body.item else body.qty
+
+    if not item_qty:
+        raise HTTPException(400, "Quantity is required")
+
+    # 6) Use selected item (item selection is now required)
+    chosen_item = None
+    if body.item and body.item.item_id is not None and 0 <= body.item.item_id < len(items):
+        # Use selected item by index
+        chosen_item = items[body.item.item_id]
+    else:
+        # Default to first item if no selection
+        chosen_item = items[0] if items else None
+
     if not chosen_item:
-        raise HTTPException(400, "No suitable item found for the given type")
+        raise HTTPException(400, "No items available for this post")
 
-    # 6) Calculate price
-    price_info = compute_min_cost(chosen_item.get("prices") or [], int(body.qty))
+    # 7) Calculate price (as suggestion only - manual prices take precedence)
+    price_info = compute_min_cost(chosen_item.get("prices") or [], int(item_qty))
 
-    # 7) Build order_id using SHA-1 hash with datetime for uniqueness
-    user_uid = body.url.split("/")[-1] if body.url else ""
+    # Use manual prices if provided, otherwise use computed price as fallback
+    # This makes compute_min_cost only a suggestion, not the final price
+    final_unit_price = body.unit_price if body.unit_price is not None else (price_info.get("total", 0) / item_qty if item_qty > 0 else 0)
+    final_total_price = body.total_price if body.total_price is not None else price_info.get("total", 0)
+
+    # 8) Build order_id using SHA-1 hash with datetime for uniqueness
+    customer_url = getattr(body.customer, 'fb_url', None) if body.customer else body.url
+    user_uid = customer_url.split("/")[-1] if customer_url else ""
     now_timestamp = datetime.now(timezone.utc).timestamp()
     order_id = hashlib.sha1(
-        f"{post_id}:{body.comment_id}:{user_uid}:{now_timestamp}".encode("utf-8")
+        f"{post_id}:{comment_id}:{user_uid}:{now_timestamp}".encode("utf-8")
     ).hexdigest()
 
     now = datetime.now(timezone.utc).isoformat()
 
-    # 8) Extract user address for the order
-    user_address = ""
-    if body.user and body.user.address:
-        user_address = body.user.address
-
+    # 9) Build the new order structure
     order_doc = {
         "order_id": order_id,
-        "comment_id": body.comment_id,
-        "comment_url": body.comment_url,
-        "comment_text": body.comment_text,
-        "comment_created_time": body.comment_created_time,
-        "url": body.url,
-        "raw_url": body.url,  # Keep original URL for traceability
-        "qty": body.qty,
-        "type": body.type,
+        "parsed_at": now,
         "currency": body.currency,
+        "raw_url": customer_url,
+        "source": {
+            "comment_id": getattr(body.source, 'comment_id', None) if body.source else body.comment_id,
+            "comment_url": getattr(body.source, 'comment_url', None) if body.source else body.comment_url,
+            "comment_text": getattr(body.source, 'comment_text', None) if body.source else body.comment_text,
+            "comment_created_time": getattr(body.source, 'comment_created_time', None) if body.source else body.comment_created_time,
+        },
+        "customer": {
+            "fb_uid": getattr(body.customer, 'fb_uid', None) if body.customer else (getattr(body.user, 'fb_uid', None) if body.user else None),
+            "fb_username": getattr(body.customer, 'fb_username', None) if body.customer else (getattr(body.user, 'fb_username', None) if body.user else None),
+            "name": getattr(body.customer, 'name', None) if body.customer else (getattr(body.user, 'name', None) if body.user else None),
+            "fb_url": getattr(body.customer, 'fb_url', None) if body.customer else (getattr(body.user, 'fb_url', None) if body.user else None),
+            "created_date": getattr(body.customer, 'created_date', None) if body.customer else None,
+            "addresses": getattr(body.customer, 'addresses', []) if body.customer else (getattr(body.user, 'addresses', []) if body.user else []),
+            "address": getattr(body.customer, 'address', None) if body.customer else (getattr(body.user, 'address', None) if body.user else None),
+            "phone_number": getattr(body.customer, 'phone_number', None) if body.customer else (getattr(body.user, 'phone_number', None) if body.user else None),
+            "avatar_url": getattr(body.customer, 'avatar_url', None) if body.customer else (getattr(body.user, 'avatar_url', None) if body.user else None),
+            "note": getattr(body.customer, 'note', None) if body.customer else None,
+        },
+        "delivery_info": {
+            "name": getattr(body.delivery_info, 'name', None) if body.delivery_info else (getattr(body.customer, 'name', None) if body.customer else (getattr(body.user, 'name', None) if body.user else None)),
+            "phone_number": getattr(body.delivery_info, 'phone_number', None) if body.delivery_info else (getattr(body.customer, 'phone_number', None) if body.customer else (getattr(body.user, 'phone_number', None) if body.user else None)),
+            "address": getattr(body.delivery_info, 'address', None) if body.delivery_info else (getattr(body.customer, 'address', None) if body.customer else (getattr(body.user, 'address', None) if body.user else None)),
+        },
+        "item": {
+            "item_id": getattr(body.item, 'item_id', 0) if body.item else 0,
+            "item_name": getattr(body.item, 'item_name', None) if body.item else chosen_item.get("name"),
+            "item_type": getattr(body.item, 'item_type', None) if body.item else chosen_item.get("type"),
+            "unit_price": final_unit_price,
+            "qty": item_qty,
+            "total_price": final_total_price,
+            "price_calculation": getattr(body.item, 'price_calculation', None) if body.item else price_info,
+        },
+        "status_code": body.status_code,
+        "status_history": [{
+            "status": body.status_code,
+            "note": "created",
+            "at": now,
+        }],
+        "note": body.note,
+    }
+
+    # 10) Add legacy fields for backward compatibility
+    order_doc.update({
+        "comment_id": comment_id,
+        "comment_url": body.source.comment_url if body.source else body.comment_url,
+        "comment_text": body.source.comment_text if body.source else body.comment_text,
+        "comment_created_time": body.source.comment_created_time if body.source else body.comment_created_time,
+        "url": customer_url,
+        "qty": item_qty,
+        "type": item_type,
         "matched_item": {
             "name": chosen_item.get("name"),
             "type": chosen_item.get("type"),
         },
-        "price_calc": price_info,
-        "status_code": body.status_code,
-        "status_history": [{
-            "status_code": body.status_code,
-            "note": "created",
-            "at": now,
-        }],
-        "parsed_at": now,
-        "source": "manual",  # Mark as manually created
-        "note": body.note,
+        "price_calc": price_info,  # Keep computed price as reference/suggestion
         "user": body.user.model_dump() if body.user else None,
-        "address": user_address,  # Single address for shipping
-    }
+        "address": body.delivery_info.address if body.delivery_info else (body.customer.address if body.customer else (body.user.address if body.user else None)),
+    })
 
     await posts_col(db, group_id).update_one(
         {"_id": post_id},
@@ -456,7 +523,7 @@ async def update_order_status(
         {
             "$set": {"orders.$[o].status_code": body.new_status_code},
             "$push": {"orders.$[o].status_history": {
-                "status_code": body.new_status_code,
+                "status": body.new_status_code,
                 "note": body.note,
                 "actor": body.actor,
                 "at": now,
@@ -474,8 +541,24 @@ async def update_order_status(
         if o.get("order_id") == order_id:
             # Convert parsed_at to local time string
             o["parsed_at"] = to_local_time(o.get("parsed_at"))
-            # Convert comment_created_time to local time string
+
+            # Convert legacy comment_created_time to local time string
             o["comment_created_time"] = to_local_time(o.get("comment_created_time"))
+
+            # Convert new structure datetime fields to strings
+            if "source" in o and o["source"]:
+                if "comment_created_time" in o["source"]:
+                    o["source"]["comment_created_time"] = to_local_time(o["source"]["comment_created_time"])
+
+            if "customer" in o and o["customer"]:
+                if "created_date" in o["customer"]:
+                    o["customer"]["created_date"] = to_local_time(o["customer"]["created_date"])
+
+            if "status_history" in o and o["status_history"]:
+                for status_entry in o["status_history"]:
+                    if "at" in status_entry:
+                        status_entry["at"] = to_local_time(status_entry["at"])
+
             return OrderOut(**o)
     raise HTTPException(404, "Order not found after update")
 
@@ -558,18 +641,36 @@ async def update_order(
             user_address = body.user.address
         update_data["orders.$[o].address"] = user_address
 
+    # Handle new price fields
+    if body.unit_price is not None:
+        update_data["orders.$[o].item.unit_price"] = body.unit_price
+    if body.total_price is not None:
+        update_data["orders.$[o].item.total_price"] = body.total_price
+
+    # Handle item selection
+    if body.item is not None:
+        if body.item.item_id is not None:
+            update_data["orders.$[o].item.item_id"] = body.item.item_id
+        if body.item.item_name is not None:
+            update_data["orders.$[o].item.item_name"] = body.item.item_name
+        if body.item.item_type is not None:
+            update_data["orders.$[o].item.item_type"] = body.item.item_type
+
     # Recalculate price if qty or type changed
     if (body.qty is not None or body.type is not None) and items:
         # Get current order to determine what to recalculate
         current_qty = existing_order.get("qty", body.qty or 1)
-        current_type = existing_order.get("type", body.type)
 
         # Use updated values
         new_qty = body.qty if body.qty is not None else current_qty
-        new_type = body.type if body.type is not None else current_type
 
-        # Pick item and calculate price
-        chosen_item = pick_item_for_comment(items, new_type)
+        # Use selected item or first item for price calculation
+        chosen_item = None
+        if body.item and body.item.item_id is not None and 0 <= body.item.item_id < len(items):
+            chosen_item = items[body.item.item_id]
+        else:
+            chosen_item = items[0] if items else None
+
         if chosen_item:
             price_info = compute_min_cost(chosen_item.get("prices") or [], int(new_qty))
             update_data["orders.$[o].matched_item"] = {
@@ -598,8 +699,24 @@ async def update_order(
         if o.get("order_id") == order_id:
             # Convert parsed_at to local time string
             o["parsed_at"] = to_local_time(o.get("parsed_at"))
-            # Convert comment_created_time to local time string
+
+            # Convert legacy comment_created_time to local time string
             o["comment_created_time"] = to_local_time(o.get("comment_created_time"))
+
+            # Convert new structure datetime fields to strings
+            if "source" in o and o["source"]:
+                if "comment_created_time" in o["source"]:
+                    o["source"]["comment_created_time"] = to_local_time(o["source"]["comment_created_time"])
+
+            if "customer" in o and o["customer"]:
+                if "created_date" in o["customer"]:
+                    o["customer"]["created_date"] = to_local_time(o["customer"]["created_date"])
+
+            if "status_history" in o and o["status_history"]:
+                for status_entry in o["status_history"]:
+                    if "at" in status_entry:
+                        status_entry["at"] = to_local_time(status_entry["at"])
+
             return OrderOut(**o)
     raise HTTPException(404, "Order not found after update")
 
@@ -615,9 +732,15 @@ async def get_orders_by_user(
     Get all orders for a specific user across all posts in the group.
     Searches for orders where the URL ends with the given UID.
     """
-    # Find all posts in the group that have orders with the matching user UID
+    # Find all posts in the group that have orders with the matching user UID (check both new and legacy structures)
     posts = posts_col(db, group_id).find(
-        {"orders.url": {"$regex": f"/{uid}$"}},
+        {
+            "$or": [
+                {"orders.customer.fb_uid": uid},
+                {"orders.user.fb_uid": uid},
+                {"orders.url": {"$regex": f"/{uid}$"}}
+            ]
+        },
         {"orders": 1, "_id": 1, "description": 1}
     )
 
@@ -625,13 +748,34 @@ async def get_orders_by_user(
     async for post in posts:
         orders = post.get("orders", [])
         for order in orders:
-            # Check if this order belongs to the user
+            # Check if this order belongs to the user (check both new and legacy structures)
+            user_fb_uid = None
+            if order.get("customer", {}).get("fb_uid"):
+                user_fb_uid = order.get("customer", {}).get("fb_uid")
+            elif order.get("user", {}).get("fb_uid"):
+                user_fb_uid = order.get("user", {}).get("fb_uid")
+
             order_url = order.get("url", "")
-            if order_url.endswith(f"/{uid}"):
+            if user_fb_uid == uid or order_url.endswith(f"/{uid}"):
                 # Convert parsed_at to local time string
                 order["parsed_at"] = to_local_time(order.get("parsed_at"))
-                # Convert comment_created_time to local time string
+
+                # Convert legacy comment_created_time to local time string
                 order["comment_created_time"] = to_local_time(order.get("comment_created_time"))
+
+                # Convert new structure datetime fields to strings
+                if "source" in order and order["source"]:
+                    if "comment_created_time" in order["source"]:
+                        order["source"]["comment_created_time"] = to_local_time(order["source"]["comment_created_time"])
+
+                if "customer" in order and order["customer"]:
+                    if "created_date" in order["customer"]:
+                        order["customer"]["created_date"] = to_local_time(order["customer"]["created_date"])
+
+                if "status_history" in order and order["status_history"]:
+                    for status_entry in order["status_history"]:
+                        if "at" in status_entry:
+                            status_entry["at"] = to_local_time(status_entry["at"])
 
                 all_orders.append(OrderOut(**order))
 

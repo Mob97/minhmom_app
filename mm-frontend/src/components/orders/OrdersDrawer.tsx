@@ -18,6 +18,15 @@ import { ImageGallery } from '@/components/ui/image-gallery';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import type { Order } from '@/types/api';
+import {
+  getOrderCustomerName,
+  getOrderCustomerUrl,
+  getOrderQuantity,
+  getOrderType,
+  getOrderTotalPrice,
+  getOrderPriceCalc,
+  getOrderCommentId
+} from '@/types/api';
 
 export const OrdersDrawer: React.FC = () => {
   const {
@@ -68,11 +77,11 @@ export const OrdersDrawer: React.FC = () => {
     if (!filteredOrders || !post?.import_price) return 0;
 
     const totalOrderValue = filteredOrders.reduce((sum, order) => {
-      return sum + (order.price_calc?.total || 0);
+      return sum + getOrderTotalPrice(order);
     }, 0);
 
     const totalQuantity = filteredOrders.reduce((sum, order) => {
-      return sum + (order.qty || 0);
+      return sum + getOrderQuantity(order);
     }, 0);
 
     const importPrice = post.import_price || 0;
@@ -88,7 +97,7 @@ export const OrdersDrawer: React.FC = () => {
 
     return filteredOrders.reduce((acc, order) => {
       if (order.status_code === 'NEW') {
-        const type = order.type || 'Unknown';
+        const type = getOrderType(order) || 'Unknown';
         acc[type] = (acc[type] || 0) + 1;
       }
       return acc;
@@ -526,31 +535,31 @@ export const OrdersDrawer: React.FC = () => {
                     </TableHeader>
                     <TableBody>
                       {filteredOrders.map((order) => (
-                        <TableRow key={order.order_id || order.comment_id}>
+                        <TableRow key={order.order_id || getOrderCommentId(order)}>
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <Button
                                 variant="link"
                                 size="sm"
                                 className="p-0 h-auto font-normal text-left justify-start truncate max-w-32"
-                                onClick={() => window.open(order.url, '_blank')}
+                                onClick={() => window.open(getOrderCustomerUrl(order), '_blank')}
                               >
-                                {order.user?.name || order.user?.fb_username || 'Unknown User'}
+                                {getOrderCustomerName(order)}
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.open(order.url, '_blank')}
+                                onClick={() => window.open(getOrderCustomerUrl(order), '_blank')}
                               >
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
-                          <TableCell>{t.currency.formatNumber(order.qty)}</TableCell>
-                          <TableCell>{order.type}</TableCell>
+                          <TableCell>{t.currency.formatNumber(getOrderQuantity(order))}</TableCell>
+                          <TableCell>{getOrderType(order)}</TableCell>
                           <TableCell>
-                            {order.price_calc ?
-                              t.currency.format(order.price_calc.total) :
+                            {getOrderPriceCalc(order) ?
+                              t.currency.format(getOrderTotalPrice(order)) :
                               '—'
                             }
                           </TableCell>
@@ -558,7 +567,7 @@ export const OrdersDrawer: React.FC = () => {
                             <Select
                               value={order.status_code || undefined}
                               onValueChange={(value: string) => handleStatusChange(
-                                order.order_id || order.comment_id || '',
+                                order.order_id || getOrderCommentId(order) || '',
                                 value
                               )}
                               disabled={updateOrderStatusMutation.isPending}
@@ -608,7 +617,7 @@ export const OrdersDrawer: React.FC = () => {
                 {/* Mobile Card View */}
                 <div className="lg:hidden space-y-4">
                   {filteredOrders.map((order) => (
-                    <div key={order.order_id || order.comment_id} className="border rounded-lg p-4 space-y-3">
+                    <div key={order.order_id || getOrderCommentId(order)} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-2">
@@ -616,17 +625,17 @@ export const OrdersDrawer: React.FC = () => {
                               variant="link"
                               size="sm"
                               className="p-0 h-auto font-medium text-left justify-start text-blue-600 hover:text-blue-800"
-                              onClick={() => window.open(order.url, '_blank')}
+                              onClick={() => window.open(getOrderCustomerUrl(order), '_blank')}
                             >
                               <span className="truncate text-sm sm:text-base">
-                                {order.user?.name || order.user?.fb_username || 'Unknown User'}
+                                {getOrderCustomerName(order)}
                               </span>
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-6 w-6 p-0 flex-shrink-0"
-                              onClick={() => window.open(order.url, '_blank')}
+                              onClick={() => window.open(getOrderCustomerUrl(order), '_blank')}
                             >
                               <ExternalLink className="h-3 w-3" />
                             </Button>
@@ -635,19 +644,19 @@ export const OrdersDrawer: React.FC = () => {
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Số lượng:</span>
-                              <span className="font-medium">{t.currency.formatNumber(order.qty)}</span>
+                              <span className="font-medium">{t.currency.formatNumber(getOrderQuantity(order))}</span>
                             </div>
 
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Loại:</span>
-                              <span className="font-medium">{order.type}</span>
+                              <span className="font-medium">{getOrderType(order)}</span>
                             </div>
 
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Tổng cộng:</span>
                               <span className="font-medium">
-                                {order.price_calc ?
-                                  t.currency.format(order.price_calc.total) :
+                                {getOrderPriceCalc(order) ?
+                                  t.currency.format(getOrderTotalPrice(order)) :
                                   '—'
                                 }
                               </span>
@@ -688,7 +697,7 @@ export const OrdersDrawer: React.FC = () => {
                         <Select
                           value={order.status_code || undefined}
                           onValueChange={(value: string) => handleStatusChange(
-                            order.order_id || order.comment_id || '',
+                            order.order_id || getOrderCommentId(order) || '',
                             value
                           )}
                           disabled={updateOrderStatusMutation.isPending}

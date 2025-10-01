@@ -177,25 +177,75 @@ export interface UpdatePostRequest {
 }
 
 // Order types
-export interface Order {
-  order_id: string;
+export interface OrderSource {
   comment_id?: string;
   comment_url?: string;
   comment_text?: string;
   comment_created_time?: string;
-  url: string;
+}
+
+export interface OrderCustomer {
+  fb_uid?: string;
+  fb_username?: string;
+  name?: string;
+  fb_url?: string;
+  created_date?: string;
+  addresses: string[];
+  address?: string;
+  phone_number?: string;
+  avatar_url?: string;
+  note?: string;
+}
+
+export interface OrderDeliveryInfo {
+  name?: string;
+  phone_number?: string;
+  address?: string;
+}
+
+export interface OrderItem {
+  item_id: number;
+  item_name?: string;
+  item_type?: string;
+  unit_price: number;
   qty: number;
-  type?: string;
-  currency: string;
-  matched_item?: PostItem;
-  price_calc?: PriceCalculation;
-  status_code: string;
-  status_history: any[];
+  total_price: number;
+  price_calculation?: PriceCalculation;
+}
+
+export interface OrderStatusHistory {
+  status: string;
+  note?: string;
+  at: string;
+}
+
+export interface Order {
+  order_id: string;
   parsed_at?: string;
-  user?: OrderUser;
+  currency: string;
+  raw_url?: string;
+  source?: OrderSource;
+  customer?: OrderCustomer;
+  delivery_info?: OrderDeliveryInfo;
+  item?: OrderItem;
+  status_code: string;
+  status_history: OrderStatusHistory[];
+  note?: string;
   post_id?: string;
   post_description?: string;
-  note?: string;
+
+  // Legacy fields for backward compatibility
+  comment_id?: string;
+  comment_url?: string;
+  comment_text?: string;
+  comment_created_time?: string;
+  url?: string;
+  qty?: number;
+  type?: string;
+  matched_item?: PostItem;
+  price_calc?: PriceCalculation;
+  user?: OrderUser;
+  address?: string;
 }
 
 export interface PriceCalculation {
@@ -212,26 +262,18 @@ export interface PriceCalcPack {
 }
 
 export interface CreateOrderRequest {
-  comment_id?: string;
-  comment_url?: string;
-  comment_text?: string;
-  comment_created_time?: string;
-  url: string;
-  qty: number;
-  type?: string;
-  currency?: string;
-  matched_item?: PostItem;
-  price_calc?: PriceCalculation;
+  source?: OrderSource;
+  customer?: OrderCustomer;
+  delivery_info?: OrderDeliveryInfo;
+  item?: OrderItem;
   status_code?: string;
   note?: string;
-  user?: {
-    name?: string;
-    address?: string;
-    phone_number?: string;
-  };
-}
 
-export interface UpdateOrderRequest {
+  // Price fields
+  unit_price?: number;
+  total_price?: number;
+
+  // Legacy fields for backward compatibility
   comment_id?: string;
   comment_url?: string;
   comment_text?: string;
@@ -242,8 +284,36 @@ export interface UpdateOrderRequest {
   currency?: string;
   matched_item?: PostItem;
   price_calc?: PriceCalculation;
+  user?: {
+    name?: string;
+    address?: string;
+    phone_number?: string;
+  };
+}
+
+export interface UpdateOrderRequest {
+  source?: OrderSource;
+  customer?: OrderCustomer;
+  delivery_info?: OrderDeliveryInfo;
+  item?: OrderItem;
   status_code?: string;
   note?: string;
+
+  // Price fields
+  unit_price?: number;
+  total_price?: number;
+
+  // Legacy fields for backward compatibility
+  comment_id?: string;
+  comment_url?: string;
+  comment_text?: string;
+  comment_created_time?: string;
+  url?: string;
+  qty?: number;
+  type?: string;
+  currency?: string;
+  matched_item?: PostItem;
+  price_calc?: PriceCalculation;
   user?: {
     name?: string;
     address?: string;
@@ -256,6 +326,55 @@ export interface UpdateOrderStatusRequest {
   note?: string;
   actor?: string;
 }
+
+// Helper functions for backward compatibility
+export const getOrderCustomerName = (order: Order): string => {
+  return order.customer?.name || order.customer?.fb_username || order.user?.name || order.user?.fb_username || 'Unknown User';
+};
+
+export const getOrderCustomerUrl = (order: Order): string => {
+  return order.customer?.fb_url || order.raw_url || order.url || '';
+};
+
+export const getOrderQuantity = (order: Order): number => {
+  return order.item?.qty || order.qty || 0;
+};
+
+export const getOrderType = (order: Order): string => {
+  return order.item?.item_type || order.type || '';
+};
+
+export const getOrderTotalPrice = (order: Order): number => {
+  return order.item?.total_price || order.price_calc?.total || 0;
+};
+
+export const getOrderPriceCalc = (order: Order): PriceCalculation | undefined => {
+  return order.item?.price_calculation || order.price_calc;
+};
+
+export const getOrderAddress = (order: Order): string => {
+  return order.delivery_info?.address || order.customer?.address || order.user?.address || order.address || '';
+};
+
+export const getOrderPhoneNumber = (order: Order): string => {
+  return order.delivery_info?.phone_number || order.customer?.phone_number || order.user?.phone_number || '';
+};
+
+export const getOrderCommentId = (order: Order): string | undefined => {
+  return order.source?.comment_id || order.comment_id;
+};
+
+export const getOrderCommentUrl = (order: Order): string | undefined => {
+  return order.source?.comment_url || order.comment_url;
+};
+
+export const getOrderCommentText = (order: Order): string | undefined => {
+  return order.source?.comment_text || order.comment_text;
+};
+
+export const getOrderCommentCreatedTime = (order: Order): string | undefined => {
+  return order.source?.comment_created_time || order.comment_created_time;
+};
 
 // API Error types
 export interface ApiError {

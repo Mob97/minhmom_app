@@ -185,11 +185,14 @@ export const t = {
   // Currency and numbers
   currency: {
     vnd: 'VND',
-    format: (amount: number) => new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(amount),
-    formatNumber: (number: number) => new Intl.NumberFormat('vi-VN').format(number),
+    format: (amount: number) => {
+      const formatted = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'VND',
+      }).format(amount);
+      return formatted.replace(/,/g, ' '); // Replace commas with spaces
+    },
+    formatNumber: (number: number) => new Intl.NumberFormat('en-US').format(number).replace(/,/g, ' '),
   },
 
   // Date and time

@@ -204,10 +204,20 @@ async def list_users_with_orders(
         {"$match": {"orders": {"$exists": True, "$ne": []}}},
         # Unwind orders array
         {"$unwind": "$orders"},
-        # Filter out orders without user data
-        {"$match": {"orders.user": {"$exists": True, "$ne": None}}},
-        # Filter out orders without fb_uid
-        {"$match": {"orders.user.fb_uid": {"$exists": True, "$ne": None}}}
+        # Filter out orders without user data (check both new and legacy structures)
+        {"$match": {
+            "$or": [
+                {"orders.customer": {"$exists": True, "$ne": None}},
+                {"orders.user": {"$exists": True, "$ne": None}}
+            ]
+        }},
+        # Filter out orders without fb_uid (check both new and legacy structures)
+        {"$match": {
+            "$or": [
+                {"orders.customer.fb_uid": {"$exists": True, "$ne": None}},
+                {"orders.user.fb_uid": {"$exists": True, "$ne": None}}
+            ]
+        }}
     ]
 
     # Add status filter if active_orders_only is True
@@ -220,6 +230,12 @@ async def list_users_with_orders(
         pipeline.append({
             "$match": {
                 "$or": [
+                    # New structure fields
+                    {"orders.customer.name": search_regex},
+                    {"orders.customer.fb_uid": search_regex},
+                    {"orders.customer.address": search_regex},
+                    {"orders.customer.phone_number": search_regex},
+                    # Legacy structure fields
                     {"orders.user.name": search_regex},
                     {"orders.user.fb_uid": search_regex},
                     {"orders.user.address": search_regex},
@@ -231,8 +247,22 @@ async def list_users_with_orders(
     # Group by user and calculate stats
     pipeline.append({
         "$group": {
-            "_id": "$orders.user.fb_uid",
-            "user_doc": {"$first": "$orders.user"},
+            "_id": {
+                "$cond": [
+                    {"$ne": ["$orders.customer.fb_uid", None]},
+                    "$orders.customer.fb_uid",
+                    "$orders.user.fb_uid"
+                ]
+            },
+            "user_doc": {
+                "$first": {
+                    "$cond": [
+                        {"$ne": ["$orders.customer", None]},
+                        "$orders.customer",
+                        "$orders.user"
+                    ]
+                }
+            },
             "orders": {"$push": {
                 "order": "$orders",
                 "post_id": "$_id",
@@ -243,14 +273,31 @@ async def list_users_with_orders(
                 "$sum": {
                     "$cond": [
                         {"$ne": ["$orders.status_code", "CANCELLED"]},
-                        {"$ifNull": ["$orders.price_calc.total", 0]},
+                        {
+                            "$ifNull": [
+                                {
+                                    "$cond": [
+                                        {"$ne": ["$orders.item.total_price", None]},
+                                        "$orders.item.total_price",
+                                        "$orders.price_calc.total"
+                                    ]
+                                },
+                                0
+                            ]
+                        },
                         0
                     ]
                 }
             },
             # For comment_created_time sorting, get the latest order time
             "latest_comment_time": {
-                "$max": "$orders.comment_created_time"
+                "$max": {
+                    "$cond": [
+                        {"$ne": ["$orders.source.comment_created_time", None]},
+                        "$orders.source.comment_created_time",
+                        "$orders.comment_created_time"
+                    ]
+                }
             }
         }
     })
@@ -363,9 +410,14 @@ async def get_user_orders_with_stats(
     if not user_doc:
         raise HTTPException(404, "User not found")
 
-    # Get all posts in the group that have orders for this user
+    # Get all posts in the group that have orders for this user (check both new and legacy structures)
     posts = posts_col(db, group_id).find(
-        {"orders.user.fb_uid": uid},
+        {
+            "$or": [
+                {"orders.customer.fb_uid": uid},
+                {"orders.user.fb_uid": uid}
+            ]
+        },
         {"orders": 1, "_id": 1, "description": 1}
     )
 
@@ -373,12 +425,33 @@ async def get_user_orders_with_stats(
     async for post in posts:
         orders = post.get("orders", [])
         for order in orders:
-            # Check if this order belongs to the user
-            if order.get("user", {}).get("fb_uid") == uid:
+            # Check if this order belongs to the user (check both new and legacy structures)
+            user_fb_uid = None
+            if order.get("customer", {}).get("fb_uid"):
+                user_fb_uid = order.get("customer", {}).get("fb_uid")
+            elif order.get("user", {}).get("fb_uid"):
+                user_fb_uid = order.get("user", {}).get("fb_uid")
+
+            if user_fb_uid == uid:
                 # Convert parsed_at to local time string
                 order["parsed_at"] = to_local_time(order.get("parsed_at"))
-                # Convert comment_created_time to local time string
+
+                # Convert legacy comment_created_time to local time string
                 order["comment_created_time"] = to_local_time(order.get("comment_created_time"))
+
+                # Convert new structure datetime fields to strings
+                if "source" in order and order["source"]:
+                    if "comment_created_time" in order["source"]:
+                        order["source"]["comment_created_time"] = to_local_time(order["source"]["comment_created_time"])
+
+                if "customer" in order and order["customer"]:
+                    if "created_date" in order["customer"]:
+                        order["customer"]["created_date"] = to_local_time(order["customer"]["created_date"])
+
+                if "status_history" in order and order["status_history"]:
+                    for status_entry in order["status_history"]:
+                        if "at" in status_entry:
+                            status_entry["at"] = to_local_time(status_entry["at"])
 
                 # Convert ObjectIds to strings
                 order_copy = convert_objectids_to_strings(order)
@@ -390,7 +463,8 @@ async def get_user_orders_with_stats(
 
     # Calculate statistics from ALL orders (not just paginated ones)
     total_revenue = sum(
-        order["order"].get("price_calc", {}).get("total", 0)
+        # Use new structure total_price if available, otherwise fall back to legacy price_calc
+        order["order"].get("item", {}).get("total_price", 0) or order["order"].get("price_calc", {}).get("total", 0)
         for order in all_orders
         if order["order"].get("status_code") != "CANCELLED"
     )
@@ -401,7 +475,12 @@ async def get_user_orders_with_stats(
     )
 
     # Sort orders by comment_created_time (newest first) for consistent pagination
-    all_orders.sort(key=lambda x: x["order"].get("comment_created_time", ""), reverse=True)
+    # Use new structure source.comment_created_time if available, otherwise fall back to legacy comment_created_time
+    all_orders.sort(key=lambda x:
+        x["order"].get("source", {}).get("comment_created_time", "") or
+        x["order"].get("comment_created_time", ""),
+        reverse=True
+    )
 
     # Apply pagination
     total_orders = len(all_orders)

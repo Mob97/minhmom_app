@@ -1,6 +1,6 @@
 # Backend Configuration
 database:
-  mongodb_uri: "mongodb://localhost:27017/"
+  mongodb_uri: mongodb://root:change-me@192.168.100.232:27017/
   db_name: "minhmom"
   default_group_id: null
 

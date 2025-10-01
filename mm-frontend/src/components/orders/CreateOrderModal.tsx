@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAppStore } from '@/store/app-store';
-import { useStatuses, useCustomers, useUpdateCustomer, useCreateUser } from '@/hooks/use-api';
+import { useStatuses, useCustomers, useUpdateCustomer, useCreateUser, usePost } from '@/hooks/use-api';
 import { t } from '@/lib/i18n';
 import type { CreateOrderRequest, OrderUser } from '@/types/api';
 import { CreateUserModal } from '@/components/users/CreateUserModal';
@@ -24,19 +24,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onSubmit,
   loading = false,
 }) => {
-  const { selectedPostId } = useAppStore();
+  const { selectedPostId, selectedGroupId } = useAppStore();
   const { data: statuses } = useStatuses({ active: true });
+  const { data: postData } = usePost(selectedGroupId || '', selectedPostId || '');
 
   const [formData, setFormData] = useState({
     url: '',
-    qty: '',
+    qty: '1',
     type: '',
     currency: 'VND',
-    status_code: '',
+    status_code: 'NEW',
     note: '',
     user_name: '',
     user_address: '',
     user_phone: '',
+    unit_price: '',
+    total_price: '',
+    selected_item_id: '0',
   });
 
   const [customerSearch, setCustomerSearch] = useState('');
@@ -46,11 +50,111 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [selectedAddress, setSelectedAddress] = useState('');
   const [isUpdatingCustomer, setIsUpdatingCustomer] = useState(false);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [isTypingTotalPrice, setIsTypingTotalPrice] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: customers, isLoading: isCustomersLoading } = useCustomers(customerSearch, 10);
   const updateCustomerMutation = useUpdateCustomer();
   const createUserMutation = useCreateUser();
+
+  // Money formatting functions
+  const formatMoney = (value: string | number): string => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '';
+    // Use spaces as thousand separators instead of dots
+    return num.toLocaleString('en-US').replace(/,/g, ' ');
+  };
+
+  const parseMoney = (value: string): number => {
+    // Remove all spaces (we use spaces as thousand separators)
+    const cleaned = value.replace(/\s/g, '');
+    return parseFloat(cleaned) || 0;
+  };
+
+  // Auto-calculate prices when item or quantity changes
+  useEffect(() => {
+    if (postData?.items && formData.selected_item_id && formData.qty) {
+      const selectedItem = postData.items[parseInt(formData.selected_item_id)];
+      if (selectedItem && selectedItem.prices) {
+        // Calculate price based on quantity using the same logic as backend
+        const qty = parseInt(formData.qty);
+        let calculatedPrice = 0;
+
+        // Find the best price tier for the quantity
+        for (const priceTier of selectedItem.prices) {
+          if (qty >= priceTier.qty) {
+            const bundles = qty / priceTier.qty;
+            calculatedPrice = bundles * priceTier.bundle_price;
+            break;
+          }
+        }
+
+        // If no price tier found, use the first one
+        if (calculatedPrice === 0 && selectedItem.prices.length > 0) {
+          const firstTier = selectedItem.prices[0];
+          const bundles = Math.ceil(qty / firstTier.qty);
+          calculatedPrice = bundles * firstTier.bundle_price;
+        }
+
+        const unitPrice = qty > 0 ? calculatedPrice / qty : 0;
+
+        setFormData(prev => ({
+          ...prev,
+          unit_price: formatMoney(unitPrice),
+          total_price: formatMoney(calculatedPrice)
+        }));
+      }
+    }
+  }, [postData, formData.selected_item_id, formData.qty]);
+
+  // Recalculate total price when quantity changes (based on current unit price)
+  useEffect(() => {
+    if (formData.qty && formData.unit_price && !isTypingTotalPrice) {
+      const qty = parseFloat(formData.qty) || 0;
+      const unitPrice = parseMoney(formData.unit_price);
+      const totalPrice = unitPrice * qty;
+
+      setFormData(prev => ({
+        ...prev,
+        total_price: formatMoney(totalPrice)
+      }));
+    }
+  }, [formData.qty, formData.unit_price, isTypingTotalPrice]);
+
+  // Calculate initial prices when dialog opens
+  useEffect(() => {
+    if (open && postData?.items && formData.selected_item_id === '0' && formData.qty === '1' && !formData.unit_price && !formData.total_price) {
+      const selectedItem = postData.items[0];
+      if (selectedItem && selectedItem.prices) {
+        const qty = 1;
+        let calculatedPrice = 0;
+
+        // Find the best price tier for the quantity
+        for (const priceTier of selectedItem.prices) {
+          if (qty >= priceTier.qty) {
+            const bundles = qty / priceTier.qty;
+            calculatedPrice = bundles * priceTier.bundle_price;
+            break;
+          }
+        }
+
+        // If no price tier found, use the first one
+        if (calculatedPrice === 0 && selectedItem.prices.length > 0) {
+          const firstTier = selectedItem.prices[0];
+          const bundles = Math.ceil(qty / firstTier.qty);
+          calculatedPrice = bundles * firstTier.bundle_price;
+        }
+
+        const unitPrice = qty > 0 ? calculatedPrice / qty : 0;
+
+        setFormData(prev => ({
+          ...prev,
+          unit_price: formatMoney(unitPrice),
+          total_price: formatMoney(calculatedPrice)
+        }));
+      }
+    }
+  }, [open, postData, formData.selected_item_id, formData.qty, formData.unit_price, formData.total_price]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -162,12 +266,48 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }
 
     const submitData: CreateOrderRequest = {
+      source: {
+        comment_id: undefined,
+        comment_url: undefined,
+        comment_text: undefined,
+        comment_created_time: undefined,
+      },
+      customer: {
+        fb_uid: selectedCustomer?.fb_uid,
+        fb_username: selectedCustomer?.fb_username,
+        name: formData.user_name || undefined,
+        fb_url: formData.url || undefined,
+        created_date: undefined,
+        addresses: selectedCustomer?.addresses || [],
+        address: formData.user_address || undefined,
+        phone_number: formData.user_phone || undefined,
+        avatar_url: selectedCustomer?.avatar_url,
+        note: undefined,
+      },
+      delivery_info: {
+        name: formData.user_name || undefined,
+        phone_number: formData.user_phone || undefined,
+        address: formData.user_address || undefined,
+      },
+      item: {
+        item_id: formData.selected_item_id ? parseInt(formData.selected_item_id) : 0,
+        item_name: formData.selected_item_id ? postData?.items?.[parseInt(formData.selected_item_id)]?.name : undefined,
+        item_type: formData.type || undefined,
+        unit_price: parseMoney(formData.unit_price),
+        qty: formData.qty ? parseFloat(formData.qty) : 0,
+        total_price: parseMoney(formData.total_price),
+        price_calculation: undefined,
+      },
+      status_code: formData.status_code || undefined,
+      note: formData.note || undefined,
+
+      // Legacy fields for backward compatibility
       url: formData.url || '',
       qty: formData.qty ? parseFloat(formData.qty) : 0,
       type: formData.type || undefined,
       currency: formData.currency || undefined,
-      status_code: formData.status_code || undefined,
-      note: formData.note || undefined,
+      unit_price: parseMoney(formData.unit_price),
+      total_price: parseMoney(formData.total_price),
       user: {
         name: formData.user_name || undefined,
         address: formData.user_address || undefined,
@@ -188,18 +328,57 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }
   };
 
+  // Handle unit price change - calculate total price
+  const handleUnitPriceChange = (value: string) => {
+    const unitPrice = parseMoney(value);
+    const qty = parseFloat(formData.qty) || 0;
+    const totalPrice = unitPrice * qty;
+
+    setFormData(prev => ({
+      ...prev,
+      unit_price: formatMoney(unitPrice),
+      total_price: formatMoney(totalPrice)
+    }));
+  };
+
+  // Handle total price change - allow free typing, calculate unit price on blur
+  const handleTotalPriceChange = (value: string) => {
+    setIsTypingTotalPrice(true);
+    setFormData(prev => ({
+      ...prev,
+      total_price: value // Don't format while typing
+    }));
+  };
+
+  // Handle total price blur - calculate unit price when user finishes typing
+  const handleTotalPriceBlur = () => {
+    setIsTypingTotalPrice(false);
+    const totalPrice = parseMoney(formData.total_price);
+    const qty = parseFloat(formData.qty) || 0;
+    const unitPrice = qty > 0 ? Math.round(totalPrice / qty) : 0; // Round unit price
+
+    setFormData(prev => ({
+      ...prev,
+      total_price: formatMoney(totalPrice),
+      unit_price: formatMoney(unitPrice)
+    }));
+  };
+
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setFormData({
         url: '',
-        qty: '',
+        qty: '1',
         type: '',
         currency: 'VND',
-        status_code: '',
+        status_code: 'NEW',
         note: '',
         user_name: '',
         user_address: '',
         user_phone: '',
+        unit_price: '',
+        total_price: '',
+        selected_item_id: '0',
       });
       setCustomerSearch('');
       setShowCustomerDropdown(false);
@@ -385,24 +564,27 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 )}
               </div>
             )}
+            {/* User URL */}
+            <div className="grid gap-2">
+              <Label htmlFor="url">{t.posts.userUrl}</Label>
+              <Input
+                id="url"
+                type="url"
+                value={formData.url}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, url: e.target.value })}
+                placeholder="https://facebook.com/profile/..."
+                readOnly={isCustomerSelected}
+                className={isCustomerSelected ? "bg-gray-100 cursor-not-allowed" : ""}
+              />
+              {isCustomerSelected && (
+                <p className="text-sm text-gray-500">
+                  URL được tự động điền từ thông tin khách hàng đã chọn
+                </p>
+              )}
+            </div>
+
+            {/* Status and Item Selection */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="url">{t.posts.userUrl}</Label>
-                <Input
-                  id="url"
-                  type="url"
-                  value={formData.url}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, url: e.target.value })}
-                  placeholder="https://facebook.com/profile/..."
-                  readOnly={isCustomerSelected}
-                  className={isCustomerSelected ? "bg-gray-100 cursor-not-allowed" : ""}
-                />
-                {isCustomerSelected && (
-                  <p className="text-sm text-gray-500">
-                    URL được tự động điền từ thông tin khách hàng đã chọn
-                  </p>
-                )}
-              </div>
               <div className="grid gap-2">
                 <Label htmlFor="status_code">{t.common.status}</Label>
                 <Select
@@ -421,8 +603,64 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="selected_item_id">Chọn sản phẩm</Label>
+                {postData?.items && postData.items.length > 0 ? (
+                  <Select
+                    value={formData.selected_item_id || undefined}
+                    onValueChange={(value: string) => setFormData({ ...formData, selected_item_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn sản phẩm từ danh sách" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {postData.items.map((item: any, index: number) => (
+                        <SelectItem key={item._id || index} value={item._id || index.toString()}>
+                          {item.name} - {item.type}
+                          {item.prices && item.prices.length > 0 && (
+                            <span className="text-sm text-muted-foreground ml-2">
+                              ({item.prices.length} giá)
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id="selected_item_id"
+                    value="Không có sản phẩm"
+                    disabled
+                    placeholder="Không có sản phẩm"
+                  />
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            {/* Item Type */}
+            <div className="grid gap-2">
+              <Label htmlFor="type">{t.common.type}</Label>
+              <Input
+                id="type"
+                value={formData.type}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, type: e.target.value })}
+                placeholder="VD: S, M, L"
+                required
+              />
+            </div>
+
+            {/* Price Information - Unit Price, Quantity, Total Price */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="unit_price">Giá đơn vị (VND)</Label>
+                <Input
+                  id="unit_price"
+                  type="text"
+                  value={formData.unit_price}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitPriceChange(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="qty">{t.common.quantity}</Label>
                 <Input
@@ -436,13 +674,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="type">{t.common.type}</Label>
+                <Label htmlFor="total_price">Tổng tiền (VND)</Label>
                 <Input
-                  id="type"
-                  value={formData.type}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, type: e.target.value })}
-                  placeholder="VD: S, M, L"
-                  required
+                  id="total_price"
+                  type="text"
+                  value={formData.total_price}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleTotalPriceChange(e.target.value)}
+                  onBlur={handleTotalPriceBlur}
+                  placeholder="0"
                 />
               </div>
             </div>

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { t } from '@/lib/i18n';
 import type { Order } from '@/types/api';
+import { getOrderCustomerName, getOrderQuantity, getOrderCommentId } from '@/types/api';
 
 interface DeleteOrderDialogProps {
   open: boolean;
@@ -28,8 +29,8 @@ export const DeleteOrderDialog: React.FC<DeleteOrderDialogProps> = ({
   loading = false,
 }) => {
   const handleConfirm = () => {
-    if (order?.order_id || order?.comment_id) {
-      onConfirm(order.order_id || order.comment_id || '');
+    if (order && (order.order_id || getOrderCommentId(order))) {
+      onConfirm(order.order_id || getOrderCommentId(order) || '');
     }
   };
 
@@ -42,11 +43,11 @@ export const DeleteOrderDialog: React.FC<DeleteOrderDialogProps> = ({
             Bạn có chắc chắn muốn xóa đơn hàng này không? Hành động này không thể hoàn tác.
             <br />
             <br />
-            <strong>Mã đơn hàng:</strong> {order?.order_id || order?.comment_id}
+            <strong>Mã đơn hàng:</strong> {order?.order_id || (order ? getOrderCommentId(order) : '')}
             <br />
-            <strong>Khách hàng:</strong> {order?.user?.name || order?.user?.fb_username || 'Unknown User'}
+            <strong>Khách hàng:</strong> {order ? getOrderCustomerName(order) : 'Unknown User'}
             <br />
-            <strong>Số lượng:</strong> {order?.qty}
+            <strong>Số lượng:</strong> {order ? getOrderQuantity(order) : 0}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

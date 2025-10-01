@@ -14,6 +14,16 @@ import { Pagination } from '@/components/ui/pagination';
 import { OrdersDrawer } from '@/components/orders/OrdersDrawer';
 import { useToast } from '@/hooks/use-toast';
 import { SortableHeader, type SortConfig } from '@/components/ui/sortable-header';
+import {
+  getOrderCustomerName,
+  getOrderCustomerUrl,
+  getOrderQuantity,
+  getOrderType,
+  getOrderTotalPrice,
+  getOrderPriceCalc,
+  getOrderCommentCreatedTime,
+  getOrderCommentId
+} from '@/types/api';
 
 export const OrdersScreen: React.FC = () => {
   const { selectedGroupId, setSelectedPostId, setOrdersDrawerOpen } = useAppStore();
@@ -336,24 +346,20 @@ export const OrdersScreen: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {ordersList.map((order: Order) => (
-                  <TableRow key={order.order_id || order.comment_id}>
+                  <TableRow key={order.order_id || getOrderCommentId(order)}>
                     <TableCell className="px-6 py-4">
-                      {order.user ? (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm">
-                            {order.user?.name || order.user?.username || order.user?.uid}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(order.user?.url || `https://www.facebook.com/${order.user?.uid}`, '_blank')}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm">
+                          {getOrderCustomerName(order)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(getOrderCustomerUrl(order), '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                     <TableCell className="px-6 py-4">
                       <div className="max-w-xs">
@@ -365,25 +371,25 @@ export const OrdersScreen: React.FC = () => {
                           disabled={!order.post_id}
                         >
                           <p className="truncate">
-                            {order.matched_item?.name || 'Chưa xác định'}
+                            {order?.item?.item_name || order?.matched_item?.name || 'Chưa xác định'}
                           </p>
                         </Button>
                       </div>
                     </TableCell>
                     <TableCell className="px-6 py-4">
                       <Badge variant="outline">
-                        {order.matched_item?.type || order.type || 'Chưa xác định'}
+                        {getOrderType(order) || 'Chưa xác định'}
                       </Badge>
                     </TableCell>
                     <TableCell className="px-6 py-4">
-                      {t.currency.formatNumber(order.qty)}
+                      {t.currency.formatNumber(getOrderQuantity(order))}
                     </TableCell>
                     <TableCell className="px-6 py-4">
-                      {order.type || '—'}
+                      {getOrderType(order) || '—'}
                     </TableCell>
                     <TableCell className="px-6 py-4 font-medium">
-                      {order.price_calc ?
-                        t.currency.format(order.price_calc.total) :
+                      {getOrderPriceCalc(order) ?
+                        t.currency.format(getOrderTotalPrice(order)) :
                         '—'
                       }
                     </TableCell>
@@ -439,7 +445,7 @@ export const OrdersScreen: React.FC = () => {
                       )}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-sm text-muted-foreground">
-                      {order.comment_created_time ? new Date(order.comment_created_time).toLocaleString('vi-VN') : '—'}
+                      {getOrderCommentCreatedTime(order) ? new Date(getOrderCommentCreatedTime(order)!).toLocaleString('vi-VN') : '—'}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
@@ -457,27 +463,21 @@ export const OrdersScreen: React.FC = () => {
           {/* Mobile Card View */}
           <div className="lg:hidden space-y-4">
             {ordersList.map((order: Order) => (
-              <div key={order.order_id || order.comment_id} className="border rounded-lg p-4 space-y-3">
+              <div key={order.order_id || getOrderCommentId(order)} className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-2">
-                      {order.user ? (
-                        <>
-                          <span className="text-sm font-medium truncate">
-                            {order.user?.name || order.user?.username || order.user?.uid}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 flex-shrink-0"
-                            onClick={() => window.open(order.user?.url || `https://www.facebook.com/${order.user?.uid}`, '_blank')}
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
+                      <span className="text-sm font-medium truncate">
+                        {getOrderCustomerName(order)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 flex-shrink-0"
+                        onClick={() => window.open(getOrderCustomerUrl(order), '_blank')}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
                     </div>
 
                     <Button
@@ -488,22 +488,22 @@ export const OrdersScreen: React.FC = () => {
                       disabled={!order.post_id}
                     >
                       <p className="truncate text-sm sm:text-base">
-                        {order.matched_item?.name || 'Chưa xác định'}
+                        {order?.item?.item_name || order?.matched_item?.name || 'Chưa xác định'}
                       </p>
                     </Button>
 
                     <div className="flex items-center space-x-2 mb-2">
                       <Badge variant="outline" className="text-xs">
-                        {order.matched_item?.type || order.type || 'Chưa xác định'}
+                        {getOrderType(order) || 'Chưa xác định'}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
-                        Qty: {t.currency.formatNumber(order.qty)}
+                        Qty: {t.currency.formatNumber(getOrderQuantity(order))}
                       </span>
                     </div>
 
                     <div className="text-sm font-medium">
-                      {order.price_calc ?
-                        t.currency.format(order.price_calc.total) :
+                      {getOrderPriceCalc(order) ?
+                        t.currency.format(getOrderTotalPrice(order)) :
                         '—'
                       }
                     </div>
@@ -572,7 +572,7 @@ export const OrdersScreen: React.FC = () => {
                 </div>
 
                 <div className="text-xs text-muted-foreground">
-                  {order.comment_created_time ? new Date(order.comment_created_time).toLocaleString('vi-VN') : '—'}
+                  {getOrderCommentCreatedTime(order) ? new Date(getOrderCommentCreatedTime(order)!).toLocaleString('vi-VN') : '—'}
                 </div>
               </div>
             ))}
