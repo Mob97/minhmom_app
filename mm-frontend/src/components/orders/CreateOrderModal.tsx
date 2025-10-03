@@ -302,7 +302,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       note: formData.note || undefined,
 
       // Legacy fields for backward compatibility
-      url: formData.url || '',
+      raw_url: formData.url || '',
       qty: formData.qty ? parseFloat(formData.qty) : 0,
       type: formData.type || undefined,
       currency: formData.currency || undefined,

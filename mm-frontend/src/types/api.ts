@@ -278,7 +278,7 @@ export interface CreateOrderRequest {
   comment_url?: string;
   comment_text?: string;
   comment_created_time?: string;
-  url?: string;
+  raw_url?: string;
   qty?: number;
   type?: string;
   currency?: string;
