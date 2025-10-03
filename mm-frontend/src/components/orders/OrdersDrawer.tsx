@@ -639,10 +639,9 @@ export const OrdersDrawer: React.FC = () => {
                               </Button>
                               {isAdmin && (
                                 <Button
-                                  variant="ghost"
+                                  variant="destructive"
                                   size="sm"
                                   onClick={() => handleDeleteOrder(order)}
-                                  className="text-destructive hover:text-destructive"
                                   title="Delete Order"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -735,10 +734,10 @@ export const OrdersDrawer: React.FC = () => {
                             </Button>
                             {isAdmin && (
                               <Button
-                                variant="ghost"
+                                variant="destructive"
                                 size="sm"
                                 onClick={() => handleDeleteOrder(order)}
-                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                className="h-8 w-8 p-0"
                                 title="Delete Order"
                               >
                                 <Trash2 className="h-4 w-4" />

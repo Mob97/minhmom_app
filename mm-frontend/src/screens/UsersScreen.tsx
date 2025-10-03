@@ -16,6 +16,7 @@ import { UserOrdersDrawer } from '@/components/orders/UserOrdersDrawer';
 import { Pagination } from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
 import { SortableHeader, type SortConfig } from '@/components/ui/sortable-header';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const UsersScreen: React.FC = () => {
   const {
@@ -74,6 +75,7 @@ export const UsersScreen: React.FC = () => {
   const updateUserMutation = useUpdateUser();
   const deleteUserMutation = useDeleteUser();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
 
   const handleCreateUser = async (data: CreateUserRequest) => {
     try {
@@ -322,14 +324,16 @@ export const UsersScreen: React.FC = () => {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingUser(user.fb_uid)}
-                        title="Xóa"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setDeletingUser(user.fb_uid)}
+                          title="Xóa"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

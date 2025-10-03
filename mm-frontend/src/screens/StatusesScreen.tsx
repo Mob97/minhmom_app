@@ -12,6 +12,7 @@ import { CreateStatusModal } from '@/components/statuses/CreateStatusModal';
 import { EditStatusModal } from '@/components/statuses/EditStatusModal';
 import { DeleteStatusDialog } from '@/components/statuses/DeleteStatusDialog';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const StatusesScreen: React.FC = () => {
   const {
@@ -34,6 +35,7 @@ export const StatusesScreen: React.FC = () => {
   const updateStatusMutation = useUpdateStatus();
   const deleteStatusMutation = useDeleteStatus();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
 
   const filteredStatuses = statuses?.filter(status =>
     status.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -214,13 +216,15 @@ export const StatusesScreen: React.FC = () => {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingStatus(status.status_code)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setDeletingStatus(status.status_code)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
