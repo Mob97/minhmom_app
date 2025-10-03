@@ -306,6 +306,14 @@ export const orderApi = {
   delete: async (groupId: string, postId: string, orderId: string): Promise<void> => {
     await apiClient.delete(`/groups/${groupId}/posts/${postId}/orders/${orderId}`);
   },
+
+  split: async (groupId: string, postId: string, orderId: string, data: { split_quantity: number; new_status_code: string; note?: string }): Promise<Order[]> => {
+    const response: AxiosResponse<Order[]> = await apiClient.post(
+      `/groups/${groupId}/posts/${postId}/orders/${orderId}/split`,
+      data
+    );
+    return response.data;
+  },
 };
 
 // Image API

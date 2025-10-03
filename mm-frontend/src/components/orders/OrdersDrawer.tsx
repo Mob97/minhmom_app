@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, Plus, ExternalLink, Edit2, Trash2 } from 'lucide-react';
+import { RefreshCw, Plus, ExternalLink, Edit2, Trash2, Split } from 'lucide-react';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
 import { DeleteOrderDialog } from './DeleteOrderDialog';
 import { ItemManagementModal } from './ItemManagementModal';
+import { SplitOrderModal } from './SplitOrderModal';
 import { useToast } from '@/hooks/use-toast';
-import { useUpdateOrderStatus, useUpdateOrder, useCreateOrder, useDeleteOrder } from '@/hooks/use-api';
+import { useUpdateOrderStatus, useUpdateOrder, useCreateOrder, useDeleteOrder, useSplitOrder } from '@/hooks/use-api';
 import { ImageGallery } from '@/components/ui/image-gallery';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ export const OrdersDrawer: React.FC = () => {
   const updateOrderMutation = useUpdateOrder();
   const createOrderMutation = useCreateOrder();
   const deleteOrderMutation = useDeleteOrder();
+  const splitOrderMutation = useSplitOrder();
   const updatePostMutation = useUpdatePost();
   const { toast } = useToast();
   const { isAdmin } = useAuth();
@@ -66,6 +68,8 @@ export const OrdersDrawer: React.FC = () => {
   const [isDeleteOrderDialogOpen, setIsDeleteOrderDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [isItemManagementModalOpen, setIsItemManagementModalOpen] = useState(false);
+  const [isSplitOrderModalOpen, setIsSplitOrderModalOpen] = useState(false);
+  const [orderToSplit, setOrderToSplit] = useState<Order | null>(null);
 
   const filteredOrders = orders?.filter(order =>
     !ordersStatusFilter || ordersStatusFilter === "all" || order.status_code === ordersStatusFilter
@@ -143,7 +147,7 @@ export const OrdersDrawer: React.FC = () => {
         onError: (error: any) => {
           toast({
             title: 'Error',
-            description: error.detail || 'Failed to update import price',
+            description: typeof error.detail === 'string' ? error.detail : 'Failed to update import price',
             variant: 'destructive',
           });
         }
@@ -173,7 +177,7 @@ export const OrdersDrawer: React.FC = () => {
     } catch (error: any) {
       toast({
         title: t.common.error,
-        description: error.detail || t.errors.unknownError,
+        description: typeof error.detail === 'string' ? error.detail : t.errors.unknownError,
         variant: 'destructive',
       });
     }
@@ -200,7 +204,7 @@ export const OrdersDrawer: React.FC = () => {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.detail || 'Failed to create order',
+        description: typeof error.detail === 'string' ? error.detail : 'Failed to create order',
         variant: 'destructive',
       });
     }
@@ -230,7 +234,7 @@ export const OrdersDrawer: React.FC = () => {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.detail || 'Failed to update order',
+        description: typeof error.detail === 'string' ? error.detail : 'Failed to update order',
         variant: 'destructive',
       });
     }
@@ -259,7 +263,7 @@ export const OrdersDrawer: React.FC = () => {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.detail || 'Failed to delete order',
+        description: typeof error.detail === 'string' ? error.detail : 'Failed to delete order',
         variant: 'destructive',
       });
     }
@@ -282,7 +286,58 @@ export const OrdersDrawer: React.FC = () => {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.detail || 'Failed to update items',
+        description: typeof error.detail === 'string' ? error.detail : 'Failed to update items',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSplitOrder = (order: Order) => {
+    setOrderToSplit(order);
+    setIsSplitOrderModalOpen(true);
+  };
+
+  const handleSplitOrderSubmit = async (splitQuantity: number, newStatus: string) => {
+    if (!selectedGroupId || !selectedPostId || !orderToSplit) return;
+
+    try {
+      await splitOrderMutation.mutateAsync({
+        groupId: selectedGroupId,
+        postId: selectedPostId,
+        orderId: orderToSplit.order_id || getOrderCommentId(orderToSplit) || '',
+        data: {
+          split_quantity: splitQuantity,
+          new_status_code: newStatus,
+          note: `Chia từ đơn hàng gốc`
+        }
+      });
+
+      toast({
+        title: 'Thành công',
+        description: `Chia đơn hàng thành công. Đã tạo đơn hàng mới với ${splitQuantity} sản phẩm.`,
+      });
+
+      setIsSplitOrderModalOpen(false);
+      setOrderToSplit(null);
+    } catch (error: any) {
+      console.error('Split order error:', error);
+
+      let errorMessage = 'Không thể chia đơn hàng';
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          errorMessage = error.response.data.detail.map((err: any) =>
+            `${err.loc?.join('.') || 'field'}: ${err.msg}`
+          ).join(', ');
+        } else if (typeof error.response.data.detail === 'string') {
+          errorMessage = error.response.data.detail;
+        }
+      } else if (typeof error.detail === 'string') {
+        errorMessage = error.detail;
+      }
+
+      toast({
+        title: 'Lỗi',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -299,10 +354,23 @@ export const OrdersDrawer: React.FC = () => {
           <DrawerHeader>
             <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0">
               <div className="flex-1">
-                <DrawerTitle className="text-lg sm:text-xl">Đơn hàng - Post #{selectedPostId}</DrawerTitle>
-                <DrawerDescription className="text-sm">
-                  {filteredOrders.length} {t.common.order.toLowerCase()}
-                </DrawerDescription>
+                <div className="flex items-center space-x-4">
+                  <div>
+                    <DrawerTitle className="text-lg sm:text-xl">Đơn hàng - Post #{selectedPostId}</DrawerTitle>
+                    <DrawerDescription className="text-sm">
+                      {filteredOrders.length} {t.common.order.toLowerCase()}
+                    </DrawerDescription>
+                  </div>
+                  {post?.local_images && post.local_images.length > 0 && (
+                    <div>
+                      <ImageGallery
+                        images={post.local_images}
+                        postId={post.id}
+                        maxDisplay={3}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Post Details */}
                 {isPostLoading ? (
@@ -312,6 +380,62 @@ export const OrdersDrawer: React.FC = () => {
                   </div>
                 ) : post ? (
                   <div className="mt-4 space-y-3">
+                    {/* Import Price - Admin Only */}
+                    {isAdmin && (
+                      <div className="flex items-center space-x-2">
+                        <h4 className="text-sm font-medium text-muted-foreground">Giá nhập:</h4>
+                        {isEditingImportPrice ? (
+                          <>
+                            <Input
+                              type="number"
+                              value={importPriceValue}
+                              onChange={(e) => setImportPriceValue(e.target.value)}
+                              placeholder="Enter import price"
+                              className="h-8 text-sm w-32"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={handleSaveImportPrice}
+                              className="h-8 px-3"
+                              disabled={updatePostMutation.isPending}
+                            >
+                              {updatePostMutation.isPending ? 'Saving...' : 'Save'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCancelEditImportPrice}
+                              className="h-8 px-3"
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-green-600">
+                              {post.import_price ? (
+                                new Intl.NumberFormat('vi-VN', {
+                                  style: 'currency',
+                                  currency: 'VND'
+                                }).format(post.import_price)
+                              ) : (
+                                <span className="text-muted-foreground">Chưa có giá nhập</span>
+                              )}
+                            </p>
+                            <Button
+                              size="sm"
+                              onClick={handleEditImportPrice}
+                              className="h-6 px-2"
+                            >
+                              <Edit2 className="h-3 w-3 mr-1" />
+                              Sửa
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+
                     {/* Post Description */}
                     {post.description && (
                       <div>
@@ -320,109 +444,6 @@ export const OrdersDrawer: React.FC = () => {
                       </div>
                     )}
 
-                     {/* Import Price - Admin Only */}
-                     {isAdmin && (
-                       <div>
-                         <h4 className="text-sm font-medium text-muted-foreground mb-1">Giá nhập:</h4>
-
-                         {isEditingImportPrice ? (
-                           <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                             <Input
-                               type="number"
-                               value={importPriceValue}
-                               onChange={(e) => setImportPriceValue(e.target.value)}
-                               placeholder="Enter import price"
-                               className="h-8 text-sm w-full sm:w-48"
-                             />
-                            <div className="flex space-x-2">
-                              <Button
-                                size="sm"
-                                onClick={handleSaveImportPrice}
-                                className="h-8 px-3 flex-1 sm:flex-none"
-                                disabled={updatePostMutation.isPending}
-                              >
-                                {updatePostMutation.isPending ? 'Saving...' : 'Save'}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleCancelEditImportPrice}
-                                className="h-8 px-3 flex-1 sm:flex-none"
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                         ) : (
-                           <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                             <p className="text-sm font-semibold text-green-600">
-                               {post.import_price ? (
-                                 new Intl.NumberFormat('vi-VN', {
-                                   style: 'currency',
-                                   currency: 'VND'
-                                 }).format(post.import_price)
-                               ) : (
-                                 <span className="text-muted-foreground">No import price set</span>
-                               )}
-                             </p>
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={handleEditImportPrice}
-                               className="h-6 px-2 w-fit"
-                             >
-                               <Edit2 className="h-3 w-3 mr-1" />
-                               Edit
-                             </Button>
-                           </div>
-                         )}
-                       </div>
-                     )}
-
-                    {/* Post Items Management */}
-                    <div>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 mb-2">
-                        <h4 className="text-sm font-medium text-muted-foreground">Sản phẩm:</h4>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsItemManagementModalOpen(true)}
-                          className="h-7 px-2 w-fit"
-                        >
-                          <Edit2 className="h-3 w-3 mr-1" />
-                          Quản lý
-                        </Button>
-                      </div>
-                      {post.items && post.items.length > 0 ? (
-                        <div className="space-y-1">
-                          {post.items.map((item, index) => (
-                            <div key={index} className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="text-xs">{item.name || 'Unnamed Item'}</Badge>
-                              {item.type && <span className="text-xs text-muted-foreground">({item.type})</span>}
-                              {item.prices && item.prices.length > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  {item.prices.length} giá
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Chưa có sản phẩm nào</p>
-                      )}
-                    </div>
-
-                    {/* Post Images */}
-                    {post.local_images && post.local_images.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Images:</h4>
-                        <ImageGallery
-                          images={post.local_images}
-                          postId={post.id}
-                          maxDisplay={3}
-                        />
-                      </div>
-                    )}
 
                   </div>
                 ) : null}
@@ -458,25 +479,14 @@ export const OrdersDrawer: React.FC = () => {
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                  <Button onClick={() => refetch()} className="w-full sm:w-auto">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {t.common.refresh}
-                  </Button>
-                  <Button onClick={handleCreateOrder} className="w-full sm:w-auto">
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t.posts.createOrder}
-                  </Button>
-                </div>
               </div>
             </div>
 
           </DrawerHeader>
 
           <div className="flex-1 overflow-auto p-4 sm:p-6">
-            {/* Filters */}
-            <div className="mb-4 flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+            {/* Filters and Action Buttons */}
+            <div className="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0 lg:space-x-4">
               <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                 <span className="text-sm font-medium">Lọc theo trạng thái:</span>
                 <Select value={ordersStatusFilter || "all"} onValueChange={setOrdersStatusFilter}>
@@ -492,6 +502,26 @@ export const OrdersDrawer: React.FC = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                <Button onClick={() => refetch()} className="w-full sm:w-auto">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {t.common.refresh}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsItemManagementModalOpen(true)}
+                  className="w-full sm:w-auto"
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Quản lý sản phẩm
+                </Button>
+                <Button onClick={handleCreateOrder} className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t.posts.createOrder}
+                </Button>
               </div>
             </div>
 
@@ -594,18 +624,30 @@ export const OrdersDrawer: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleEditOrder(order)}
+                                onClick={() => handleSplitOrder(order)}
+                                title="Split Order"
                               >
-                                <Edit2 className="h-4 w-4" />
+                                <Split className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteOrder(order)}
-                                className="text-destructive hover:text-destructive"
+                                onClick={() => handleEditOrder(order)}
+                                title="Edit Order"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Edit2 className="h-4 w-4" />
                               </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteOrder(order)}
+                                  className="text-destructive hover:text-destructive"
+                                  title="Delete Order"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -676,19 +718,32 @@ export const OrdersDrawer: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleEditOrder(order)}
+                              onClick={() => handleSplitOrder(order)}
                               className="h-8 w-8 p-0"
+                              title="Split Order"
                             >
-                              <Edit2 className="h-4 w-4" />
+                              <Split className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteOrder(order)}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              onClick={() => handleEditOrder(order)}
+                              className="h-8 w-8 p-0"
+                              title="Edit Order"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Edit2 className="h-4 w-4" />
                             </Button>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteOrder(order)}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                title="Delete Order"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -752,6 +807,14 @@ export const OrdersDrawer: React.FC = () => {
         items={post?.items || []}
         onSave={handleSaveItems}
         loading={updatePostMutation.isPending}
+      />
+
+      <SplitOrderModal
+        open={isSplitOrderModalOpen}
+        onOpenChange={setIsSplitOrderModalOpen}
+        order={orderToSplit}
+        onSplit={handleSplitOrderSubmit}
+        loading={splitOrderMutation.isPending}
       />
     </>
   );

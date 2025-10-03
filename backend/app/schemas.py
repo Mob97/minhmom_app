@@ -222,7 +222,7 @@ class OrderIn(BaseModel):
     comment_text: Optional[str] = None
     comment_created_time: Optional[str] = None
 
-    url: str                 # canonical user link
+    raw_url: str             # canonical user link
     qty: float = Field(ge=0.0)
     type: Optional[str] = None
     currency: str = "VND"
@@ -273,6 +273,12 @@ class OrderStatusPatch(BaseModel):
     new_status_code: str
     note: Optional[str] = None
     actor: Optional[str] = None
+
+
+class SplitOrderRequest(BaseModel):
+    split_quantity: int = Field(gt=0, description="Quantity to split to new order")
+    new_status_code: str = Field(description="Status for the new split order")
+    note: Optional[str] = None
 
 
 # =========================

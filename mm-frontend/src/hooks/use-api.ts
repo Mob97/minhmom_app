@@ -308,3 +308,19 @@ export const useDeleteOrder = () => {
     },
   });
 };
+
+export const useSplitOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ groupId, postId, orderId, data }: { groupId: string; postId: string; orderId: string; data: { split_quantity: number; new_status_code: string; note?: string } }) =>
+      orderApi.split(groupId, postId, orderId, data),
+    onSuccess: (_, { groupId, postId }) => {
+      // Invalidate both the specific post's orders and all orders queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders(groupId, postId) });
+      queryClient.invalidateQueries({ queryKey: ['all-orders', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['user-orders-with-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['users-with-orders'] });
+    },
+  });
+};

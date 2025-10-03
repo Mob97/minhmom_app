@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from datetime import datetime, timezone
 from ..db import get_db, posts_col, statuses_col
-from ..schemas import PostPatch, PostOut, OrderIn, OrderOut, OrderStatusPatch, PaginatedResponse
+from ..schemas import PostPatch, PostOut, OrderIn, OrderOut, OrderStatusPatch, SplitOrderRequest, PaginatedResponse
 from ..auth import require_user_or_admin
 from ..utils import to_local_time, compute_min_cost
 import hashlib
@@ -530,7 +530,10 @@ async def update_order_status(
     res = await posts_col(db, group_id).update_one(
         {"_id": post_id, "orders.order_id": order_id},
         {
-            "$set": {"orders.$[o].status_code": body.new_status_code},
+            "$set": {
+                "orders.$[o].status_code": body.new_status_code,
+                "orders_last_update_at": now
+            },
             "$push": {"orders.$[o].status_history": {
                 "status": body.new_status_code,
                 "note": body.note,
@@ -609,6 +612,7 @@ async def update_order(
 
     # Build update data
     update_data = {}
+    # Legacy fields for backward compatibility
     if body.comment_id is not None:
         update_data["orders.$[o].comment_id"] = body.comment_id
     if body.comment_url is not None:
@@ -617,38 +621,27 @@ async def update_order(
         update_data["orders.$[o].comment_text"] = body.comment_text
     if body.comment_created_time is not None:
         update_data["orders.$[o].comment_created_time"] = body.comment_created_time
-    if body.url is not None:
-        update_data["orders.$[o].url"] = body.url
-        update_data["orders.$[o].raw_url"] = body.url  # Update raw_url too
+    if body.raw_url is not None:
+        update_data["orders.$[o].raw_url"] = body.raw_url
     if body.qty is not None:
-        update_data["orders.$[o].qty"] = body.qty
+        update_data["orders.$[o].item.qty"] = body.qty
     if body.type is not None:
-        update_data["orders.$[o].type"] = body.type
+        update_data["orders.$[o].item.item_type"] = body.type
     if body.currency is not None:
         update_data["orders.$[o].currency"] = body.currency
-    if body.matched_item is not None:
-        update_data["orders.$[o].matched_item"] = body.matched_item.model_dump()
-    if body.price_calc is not None:
-        update_data["orders.$[o].price_calc"] = body.price_calc.model_dump()
+    status_history_entry = None
     if body.status_code is not None:
         update_data["orders.$[o].status_code"] = body.status_code
-        # Add status history entry
-        update_data["$push"] = {
-            "orders.$[o].status_history": {
-                "status": body.status_code,
-                "note": "updated",
-                "at": now,
-            }
+        # Add status history entry - we'll handle this separately
+        status_history_entry = {
+            "status": body.status_code,
+            "note": "updated",
+            "at": now,
         }
     if body.note is not None:
         update_data["orders.$[o].note"] = body.note
     if body.user is not None:
         update_data["orders.$[o].user"] = body.user.model_dump()
-        # Update address field when user is updated
-        user_address = ""
-        if body.user.address:
-            user_address = body.user.address
-        update_data["orders.$[o].address"] = user_address
 
     # Handle new price fields
     if body.unit_price is not None:
@@ -664,6 +657,12 @@ async def update_order(
             update_data["orders.$[o].item.item_name"] = body.item.item_name
         if body.item.item_type is not None:
             update_data["orders.$[o].item.item_type"] = body.item.item_type
+        if body.item.qty is not None:
+            update_data["orders.$[o].item.qty"] = body.item.qty
+        if body.item.unit_price is not None:
+            update_data["orders.$[o].item.unit_price"] = body.item.unit_price
+        if body.item.total_price is not None:
+            update_data["orders.$[o].item.total_price"] = body.item.total_price
 
     # Recalculate price if qty or type changed
     if (body.qty is not None or body.type is not None) and items:
@@ -682,17 +681,24 @@ async def update_order(
 
         if chosen_item:
             price_info = compute_min_cost(chosen_item.get("prices") or [], int(new_qty))
-            update_data["orders.$[o].matched_item"] = {
-                "name": chosen_item.get("name"),
-                "type": chosen_item.get("type"),
-            }
-            update_data["orders.$[o].price_calc"] = price_info
+            # Update item structure with calculated prices
+            update_data["orders.$[o].item.item_name"] = chosen_item.get("name")
+            update_data["orders.$[o].item.item_type"] = chosen_item.get("type")
+            update_data["orders.$[o].item.unit_price"] = price_info.get("total", 0) / new_qty if new_qty > 0 else 0
+            update_data["orders.$[o].item.total_price"] = price_info.get("total", 0)
+            update_data["orders.$[o].item.price_calculation"] = price_info
+            # Ensure item.qty is updated with the new quantity
+            update_data["orders.$[o].item.qty"] = new_qty
 
     # Update the order
+    # First, update the order data
     res = await posts_col(db, group_id).update_one(
         {"_id": post_id, "orders.order_id": order_id},
         {
-            "$set": update_data,
+            "$set": {
+                **update_data,
+                "orders_last_update_at": now
+            },
             "$setOnInsert": {},
         },
         array_filters=[{"o.order_id": order_id}],
@@ -701,6 +707,18 @@ async def update_order(
 
     if res.matched_count == 0:
         raise HTTPException(404, "Order not found")
+
+    # If status was updated, add status history entry separately
+    if status_history_entry is not None:
+        await posts_col(db, group_id).update_one(
+            {"_id": post_id, "orders.order_id": order_id},
+            {
+                "$push": {
+                    "orders.$[o].status_history": status_history_entry
+                }
+            },
+            array_filters=[{"o.order_id": order_id}]
+        )
 
     # Return the updated order
     d = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
@@ -728,6 +746,171 @@ async def update_order(
 
             return OrderOut(**o)
     raise HTTPException(404, "Order not found after update")
+
+
+@router.post("/{post_id}/orders/{order_id}/split", response_model=List[OrderOut])
+async def split_order(
+    group_id: str,
+    post_id: str,
+    order_id: str,
+    body: SplitOrderRequest,
+    current_user: dict = Depends(require_user_or_admin()),
+    db=Depends(get_db)
+):
+    """
+    Split an order by creating a new order with split quantity and updating the original order.
+    This is a transactional operation that either succeeds completely or fails completely.
+    """
+    from datetime import datetime, timezone
+
+    # Validate status_code
+    st = await statuses_col(db).find_one({"status_code": body.new_status_code})
+    if not st:
+        raise HTTPException(400, f"Unknown status_code: {body.new_status_code}")
+
+    # Ensure the post exists
+    post = await posts_col(db, group_id).find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(404, "Post not found")
+
+    # Find the order to split
+    existing_order = None
+    for order in post.get("orders", []):
+        if order.get("order_id") == order_id:
+            existing_order = order
+            break
+
+    if not existing_order:
+        raise HTTPException(404, "Order not found")
+
+    # Validate split quantity
+    original_qty = existing_order.get("item", {}).get("qty") or existing_order.get("qty", 0)
+    if body.split_quantity >= original_qty:
+        raise HTTPException(400, "Split quantity must be less than original quantity")
+
+    if body.split_quantity <= 0:
+        raise HTTPException(400, "Split quantity must be greater than 0")
+
+    remaining_qty = original_qty - body.split_quantity
+    now = datetime.now(timezone.utc).isoformat()
+
+    try:
+        # Create the new order
+        new_order_id = f"{order_id}_split_{int(datetime.now().timestamp())}"
+
+        # Prepare new order data
+        new_order = {
+            "order_id": new_order_id,
+            "parsed_at": now,
+            "currency": existing_order.get("currency", "VND"),
+            "raw_url": existing_order.get("raw_url"),
+            "source": existing_order.get("source"),
+            "customer": existing_order.get("customer"),
+            "delivery_info": existing_order.get("delivery_info"),
+            "item": {
+                **existing_order.get("item", {}),
+                "qty": body.split_quantity,
+                "total_price": existing_order.get("item", {}).get("unit_price", 0) * body.split_quantity
+            } if existing_order.get("item") else {
+                "qty": body.split_quantity,
+                "total_price": existing_order.get("unit_price", 0) * body.split_quantity
+            },
+            "status_code": body.new_status_code,
+            "status_history": [{
+                "status": body.new_status_code,
+                "note": body.note or "Split from original order",
+                "at": now
+            }],
+            "note": body.note,
+            # Legacy fields
+            "comment_id": existing_order.get("comment_id"),
+            "comment_url": existing_order.get("comment_url"),
+            "comment_text": existing_order.get("comment_text"),
+            "comment_created_time": existing_order.get("comment_created_time"),
+            "url": existing_order.get("url"),
+            "qty": body.split_quantity,
+            "type": existing_order.get("type"),
+            "matched_item": existing_order.get("matched_item"),
+            "price_calc": existing_order.get("price_calc"),
+            "user": existing_order.get("user"),
+            "address": existing_order.get("address")
+        }
+
+        # First, add the new order
+        result1 = await posts_col(db, group_id).update_one(
+            {"_id": post_id},
+            {
+                "$push": {"orders": new_order},
+                "$set": {"orders_last_update_at": now}
+            }
+        )
+
+        if result1.matched_count == 0:
+            raise HTTPException(404, "Post not found during split")
+
+        # Then, update the original order with reduced quantity
+        update_data = {
+            "$set": {
+                "orders.$[o].qty": remaining_qty,
+                "orders.$[o].item.qty": remaining_qty,
+                "orders.$[o].item.total_price": existing_order.get("item", {}).get("unit_price", 0) * remaining_qty,
+                "orders.$[o].total_price": existing_order.get("item", {}).get("unit_price", 0) * remaining_qty,
+                "orders_last_update_at": now
+            }
+        }
+
+        result2 = await posts_col(db, group_id).update_one(
+            {"_id": post_id, "orders.order_id": order_id},
+            update_data,
+            array_filters=[{"o.order_id": order_id}]
+        )
+
+        if result2.matched_count == 0:
+            # If the second update fails, we need to clean up the first operation
+            # Remove the newly added order
+            await posts_col(db, group_id).update_one(
+                {"_id": post_id},
+                {"$pull": {"orders": {"order_id": new_order_id}}}
+            )
+            raise HTTPException(500, "Failed to update original order during split")
+
+        # Return both orders
+        updated_post = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
+        orders = []
+        for order in updated_post.get("orders", []):
+            if order.get("order_id") in [order_id, new_order_id]:
+                # Convert datetime fields to local time strings
+                order["parsed_at"] = to_local_time(order.get("parsed_at"))
+                order["comment_created_time"] = to_local_time(order.get("comment_created_time"))
+
+                if "source" in order and order["source"]:
+                    if "comment_created_time" in order["source"]:
+                        order["source"]["comment_created_time"] = to_local_time(order["source"]["comment_created_time"])
+
+                if "customer" in order and order["customer"]:
+                    if "created_date" in order["customer"]:
+                        order["customer"]["created_date"] = to_local_time(order["customer"]["created_date"])
+
+                if "status_history" in order and order["status_history"]:
+                    for status_entry in order["status_history"]:
+                        if "at" in status_entry:
+                            status_entry["at"] = to_local_time(status_entry["at"])
+
+                orders.append(OrderOut(**order))
+
+        return orders
+
+    except Exception as e:
+        # If any operation fails, we attempt to clean up
+        try:
+            # Try to remove the newly added order if it exists
+            await posts_col(db, group_id).update_one(
+                {"_id": post_id},
+                {"$pull": {"orders": {"order_id": new_order_id}}}
+            )
+        except Exception:
+            pass  # Ignore cleanup errors
+        raise HTTPException(500, f"Failed to split order: {str(e)}")
 
 
 @router.get("/orders/by-user/{uid}", response_model=List[OrderOut])
@@ -818,9 +1001,13 @@ async def delete_order(
         raise HTTPException(404, "Order not found")
 
     # Remove the order from the post
+    now = datetime.now(timezone.utc).isoformat()
     result = await posts_col(db, group_id).update_one(
         {"_id": post_id},
-        {"$pull": {"orders": {"order_id": order_id}}}
+        {
+            "$pull": {"orders": {"order_id": order_id}},
+            "$set": {"orders_last_update_at": now}
+        }
     )
 
     if result.modified_count == 0:

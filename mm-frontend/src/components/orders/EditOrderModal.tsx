@@ -55,8 +55,6 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   };
 
   const [formData, setFormData] = useState({
-    comment_url: '',
-    comment_text: '',
     url: '',
     qty: '',
     type: '',
@@ -76,8 +74,6 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   useEffect(() => {
     if (order) {
       setFormData({
-        comment_url: getOrderCommentUrl(order) || '',
-        comment_text: getOrderCommentText(order) || '',
         url: getOrderCustomerUrl(order) || '',
         qty: getOrderQuantity(order)?.toString() || '',
         type: getOrderType(order) || '',
@@ -157,9 +153,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const submitData: UpdateOrderRequest = {
-      comment_url: formData.comment_url || undefined,
-      comment_text: formData.comment_text || undefined,
-      url: formData.url || undefined,
+      raw_url: formData.url || undefined,
       qty: formData.qty ? parseFloat(formData.qty) : undefined,
       type: formData.type || undefined,
       currency: formData.currency || undefined,
@@ -191,8 +185,6 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       // Reset form when closing
       if (order) {
         setFormData({
-          comment_url: getOrderCommentUrl(order) || '',
-          comment_text: getOrderCommentText(order) || '',
           url: getOrderCustomerUrl(order) || '',
           qty: getOrderQuantity(order)?.toString() || '',
           type: getOrderType(order) || '',
@@ -202,8 +194,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
           user_name: getOrderCustomerName(order) || '',
           user_address: getOrderAddress(order) || '',
           user_phone: getOrderPhoneNumber(order) || '',
-          unit_price: order?.item?.unit_price?.toString() || '',
-          total_price: getOrderTotalPrice(order)?.toString() || '',
+          unit_price: formatMoney(order?.item?.unit_price || 0),
+          total_price: formatMoney(getOrderTotalPrice(order) || 0),
           selected_item_id: order?.item?.item_id?.toString() || '',
         });
       }
@@ -273,36 +265,6 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="comment_url">URL bình luận</Label>
-                <Input
-                  id="comment_url"
-                  type="url"
-                  value={formData.comment_url}
-                  readOnly
-                  className="bg-gray-100 cursor-not-allowed"
-                  placeholder="https://facebook.com/..."
-                />
-                <p className="text-sm text-gray-500">
-                  URL bình luận không thể chỉnh sửa
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="comment_text">{t.posts.commentText}</Label>
-                <Textarea
-                  id="comment_text"
-                  value={formData.comment_text}
-                  readOnly
-                  className="bg-gray-100 cursor-not-allowed"
-                  placeholder="Nội dung bình luận..."
-                  rows={2}
-                />
-                <p className="text-sm text-gray-500">
-                  Nội dung bình luận không thể chỉnh sửa
-                </p>
-              </div>
-            </div>
 
             {/* Status and Item Selection */}
             <div className="grid grid-cols-2 gap-4">
