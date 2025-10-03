@@ -355,6 +355,15 @@ async def list_orders(
             for status_entry in o["status_history"]:
                 if "at" in status_entry:
                     status_entry["at"] = to_local_time(status_entry["at"])
+
+        # Handle item_id type conversion for backward compatibility
+        if "item" in o and o["item"] and "item_id" in o["item"]:
+            item_id = o["item"]["item_id"]
+            if isinstance(item_id, str):
+                # If item_id is a string (legacy data), convert to None or 0
+                # This prevents validation errors while maintaining functionality
+                o["item"]["item_id"] = None
+
         out.append(OrderOut(**o))
     return out
 
@@ -626,7 +635,7 @@ async def update_order(
         # Add status history entry
         update_data["$push"] = {
             "orders.$[o].status_history": {
-                "status_code": body.status_code,
+                "status": body.status_code,
                 "note": "updated",
                 "at": now,
             }
