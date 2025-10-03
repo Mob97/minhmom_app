@@ -140,14 +140,14 @@ export const OrdersDrawer: React.FC = () => {
         onSuccess: () => {
           setIsEditingImportPrice(false);
           toast({
-            title: 'Success',
-            description: 'Import price updated successfully',
+        title: 'Thành công',
+        description: 'Cập nhật giá nhập thành công',
           });
         },
         onError: (error: any) => {
           toast({
-            title: 'Error',
-            description: typeof error.detail === 'string' ? error.detail : 'Failed to update import price',
+        title: 'Lỗi',
+        description: typeof error.detail === 'string' ? error.detail : 'Không thể cập nhật giá nhập',
             variant: 'destructive',
           });
         }
@@ -197,14 +197,14 @@ export const OrdersDrawer: React.FC = () => {
         data
       });
       toast({
-        title: 'Success',
-        description: 'Order created successfully',
+        title: 'Thành công',
+        description: 'Tạo đơn hàng thành công',
       });
       setCreateOrderModalOpen(false);
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: typeof error.detail === 'string' ? error.detail : 'Failed to create order',
+        title: 'Lỗi',
+        description: typeof error.detail === 'string' ? error.detail : 'Không thể tạo đơn hàng',
         variant: 'destructive',
       });
     }
@@ -226,15 +226,15 @@ export const OrdersDrawer: React.FC = () => {
         data
       });
       toast({
-        title: 'Success',
-        description: 'Order updated successfully',
+        title: 'Thành công',
+        description: 'Cập nhật đơn hàng thành công',
       });
       setIsEditOrderModalOpen(false);
       setSelectedOrder(null);
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: typeof error.detail === 'string' ? error.detail : 'Failed to update order',
+        title: 'Lỗi',
+        description: typeof error.detail === 'string' ? error.detail : 'Không thể cập nhật đơn hàng',
         variant: 'destructive',
       });
     }
@@ -255,15 +255,15 @@ export const OrdersDrawer: React.FC = () => {
         orderId
       });
       toast({
-        title: 'Success',
-        description: 'Order deleted successfully',
+        title: 'Thành công',
+        description: 'Xóa đơn hàng thành công',
       });
       setIsDeleteOrderDialogOpen(false);
       setOrderToDelete(null);
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: typeof error.detail === 'string' ? error.detail : 'Failed to delete order',
+        title: 'Lỗi',
+        description: typeof error.detail === 'string' ? error.detail : 'Không thể xóa đơn hàng',
         variant: 'destructive',
       });
     }
@@ -279,14 +279,14 @@ export const OrdersDrawer: React.FC = () => {
         data: { items }
       });
       toast({
-        title: 'Success',
-        description: 'Items updated successfully',
+        title: 'Thành công',
+        description: 'Cập nhật sản phẩm thành công',
       });
       setIsItemManagementModalOpen(false);
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: typeof error.detail === 'string' ? error.detail : 'Failed to update items',
+        title: 'Lỗi',
+        description: typeof error.detail === 'string' ? error.detail : 'Không thể cập nhật sản phẩm',
         variant: 'destructive',
       });
     }
@@ -625,7 +625,7 @@ export const OrdersDrawer: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleSplitOrder(order)}
-                                title="Split Order"
+                                title="Chia đơn hàng"
                               >
                                 <Split className="h-4 w-4" />
                               </Button>
@@ -633,7 +633,7 @@ export const OrdersDrawer: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEditOrder(order)}
-                                title="Edit Order"
+                                title="Sửa đơn hàng"
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
@@ -642,7 +642,7 @@ export const OrdersDrawer: React.FC = () => {
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => handleDeleteOrder(order)}
-                                  title="Delete Order"
+                                  title="Xóa đơn hàng"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -719,7 +719,7 @@ export const OrdersDrawer: React.FC = () => {
                               size="sm"
                               onClick={() => handleSplitOrder(order)}
                               className="h-8 w-8 p-0"
-                              title="Split Order"
+                              title="Chia đơn hàng"
                             >
                               <Split className="h-4 w-4" />
                             </Button>
@@ -728,7 +728,7 @@ export const OrdersDrawer: React.FC = () => {
                               size="sm"
                               onClick={() => handleEditOrder(order)}
                               className="h-8 w-8 p-0"
-                              title="Edit Order"
+                              title="Sửa đơn hàng"
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>
@@ -738,7 +738,7 @@ export const OrdersDrawer: React.FC = () => {
                                 size="sm"
                                 onClick={() => handleDeleteOrder(order)}
                                 className="h-8 w-8 p-0"
-                                title="Delete Order"
+                                title="Xóa đơn hàng"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

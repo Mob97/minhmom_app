@@ -249,7 +249,7 @@ async def get_post(
 ):
     d = await posts_col(db, group_id).find_one({"_id": post_id})
     if not d:
-        raise HTTPException(404, "Post not found")
+        raise HTTPException(404, "Không tìm thấy bài viết")
 
     # Filter import_price based on user role
     user_role = current_user.get("role", "user")
@@ -291,12 +291,12 @@ async def patch_post(
         )
 
     if not update:
-        raise HTTPException(400, "No fields to update")
+        raise HTTPException(400, "Không có trường nào để cập nhật")
 
     await posts_col(db, group_id).update_one({"_id": post_id}, {"$set": update})
     d = await posts_col(db, group_id).find_one({"_id": post_id})
     if not d:
-        raise HTTPException(404, "Post not found after update")
+        raise HTTPException(404, "Không tìm thấy bài viết sau khi cập nhật")
 
     # Filter import_price based on user role
     user_role = current_user.get("role", "user")
@@ -332,7 +332,7 @@ async def list_orders(
 ):
     d = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
     if not d:
-        raise HTTPException(404, "Post not found")
+        raise HTTPException(404, "Không tìm thấy bài viết")
     orders = d.get("orders") or []
     out = []
     for o in orders:
@@ -379,12 +379,12 @@ async def create_order(
     # 1) Validate status_code
     st = await statuses_col(db).find_one({"status_code": body.status_code})
     if not st:
-        raise HTTPException(400, f"Unknown status_code: {body.status_code}")
+        raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.status_code}")
 
     # 2) Ensure the post exists
     post = await posts_col(db, group_id).find_one({"_id": post_id})
     if not post:
-        raise HTTPException(404, "Post not found")
+        raise HTTPException(404, "Không tìm thấy bài viết")
 
     # 3) Prevent duplicate by comment_id (check both new and legacy structures)
     comment_id = body.source.comment_id if body.source else body.comment_id
@@ -393,19 +393,19 @@ async def create_order(
             {"_id": post_id, "orders.comment_id": comment_id}, {"_id": 1}
         )
         if dup:
-            raise HTTPException(409, "Order with this comment_id already exists")
+            raise HTTPException(409, "Đơn hàng với comment_id này đã tồn tại")
 
     # 4) Get post items for price calculation
     items = post.get("items") or []
     if not items:
-        raise HTTPException(400, "Post has no items for price calculation")
+        raise HTTPException(400, "Bài viết không có sản phẩm để tính giá")
 
     # 5) Determine item type and quantity (support both new and legacy structures)
     item_type = body.item.item_type if body.item else body.type
     item_qty = body.item.qty if body.item else body.qty
 
     if not item_qty:
-        raise HTTPException(400, "Quantity is required")
+        raise HTTPException(400, "Số lượng là bắt buộc")
 
     # 6) Use selected item (item selection is now required)
     chosen_item = None
@@ -417,7 +417,7 @@ async def create_order(
         chosen_item = items[0] if items else None
 
     if not chosen_item:
-        raise HTTPException(400, "No items available for this post")
+        raise HTTPException(400, "Không có sản phẩm nào cho bài viết này")
 
     # 7) Calculate price (as suggestion only - manual prices take precedence)
     price_info = compute_min_cost(chosen_item.get("prices") or [], int(item_qty))
@@ -524,7 +524,7 @@ async def update_order_status(
     # Validate target status
     st = await statuses_col(db).find_one({"status_code": body.new_status_code})
     if not st:
-        raise HTTPException(400, f"Unknown status_code: {body.new_status_code}")
+        raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.new_status_code}")
 
     now = datetime.now(timezone.utc).isoformat()
     res = await posts_col(db, group_id).update_one(
@@ -546,7 +546,7 @@ async def update_order_status(
         upsert=False,
     )
     if res.matched_count == 0:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(404, "Không tìm thấy đơn hàng")
 
     d = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
     for o in d.get("orders") or []:
@@ -572,7 +572,7 @@ async def update_order_status(
                         status_entry["at"] = to_local_time(status_entry["at"])
 
             return OrderOut(**o)
-    raise HTTPException(404, "Order not found after update")
+        raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
 
 
 @router.patch("/{post_id}/orders/{order_id}", response_model=OrderOut)
@@ -588,12 +588,12 @@ async def update_order(
     if body.status_code:
         st = await statuses_col(db).find_one({"status_code": body.status_code})
         if not st:
-            raise HTTPException(400, f"Unknown status_code: {body.status_code}")
+            raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.status_code}")
 
     # Ensure the post exists
     post = await posts_col(db, group_id).find_one({"_id": post_id})
     if not post:
-        raise HTTPException(404, "Post not found")
+        raise HTTPException(404, "Không tìm thấy bài viết")
 
     # Check if order exists
     existing_order = None
@@ -603,7 +603,7 @@ async def update_order(
             break
 
     if not existing_order:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(404, "Không tìm thấy đơn hàng")
 
     now = datetime.now(timezone.utc).isoformat()
 
@@ -634,9 +634,9 @@ async def update_order(
         update_data["orders.$[o].status_code"] = body.status_code
         # Add status history entry - we'll handle this separately
         status_history_entry = {
-            "status": body.status_code,
-            "note": "updated",
-            "at": now,
+                "status": body.status_code,
+                "note": "updated",
+                "at": now,
         }
     if body.note is not None:
         update_data["orders.$[o].note"] = body.note
@@ -706,7 +706,7 @@ async def update_order(
     )
 
     if res.matched_count == 0:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(404, "Không tìm thấy đơn hàng")
 
     # If status was updated, add status history entry separately
     if status_history_entry is not None:
@@ -745,7 +745,7 @@ async def update_order(
                         status_entry["at"] = to_local_time(status_entry["at"])
 
             return OrderOut(**o)
-    raise HTTPException(404, "Order not found after update")
+        raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
 
 
 @router.post("/{post_id}/orders/{order_id}/split", response_model=List[OrderOut])
@@ -766,12 +766,12 @@ async def split_order(
     # Validate status_code
     st = await statuses_col(db).find_one({"status_code": body.new_status_code})
     if not st:
-        raise HTTPException(400, f"Unknown status_code: {body.new_status_code}")
+        raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.new_status_code}")
 
     # Ensure the post exists
     post = await posts_col(db, group_id).find_one({"_id": post_id})
     if not post:
-        raise HTTPException(404, "Post not found")
+        raise HTTPException(404, "Không tìm thấy bài viết")
 
     # Find the order to split
     existing_order = None
@@ -781,15 +781,15 @@ async def split_order(
             break
 
     if not existing_order:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(404, "Không tìm thấy đơn hàng")
 
     # Validate split quantity
     original_qty = existing_order.get("item", {}).get("qty") or existing_order.get("qty", 0)
     if body.split_quantity >= original_qty:
-        raise HTTPException(400, "Split quantity must be less than original quantity")
+        raise HTTPException(400, "Số lượng chia phải nhỏ hơn số lượng gốc")
 
     if body.split_quantity <= 0:
-        raise HTTPException(400, "Split quantity must be greater than 0")
+        raise HTTPException(400, "Số lượng chia phải lớn hơn 0")
 
     remaining_qty = original_qty - body.split_quantity
     now = datetime.now(timezone.utc).isoformat()
@@ -846,7 +846,7 @@ async def split_order(
         )
 
         if result1.matched_count == 0:
-            raise HTTPException(404, "Post not found during split")
+            raise HTTPException(404, "Không tìm thấy bài viết trong quá trình chia đơn hàng")
 
         # Then, update the original order with reduced quantity
         update_data = {
@@ -872,7 +872,7 @@ async def split_order(
                 {"_id": post_id},
                 {"$pull": {"orders": {"order_id": new_order_id}}}
             )
-            raise HTTPException(500, "Failed to update original order during split")
+            raise HTTPException(500, "Không thể cập nhật đơn hàng gốc trong quá trình chia")
 
         # Return both orders
         updated_post = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
@@ -910,7 +910,7 @@ async def split_order(
             )
         except Exception:
             pass  # Ignore cleanup errors
-        raise HTTPException(500, f"Failed to split order: {str(e)}")
+        raise HTTPException(500, f"Không thể chia đơn hàng: {str(e)}")
 
 
 @router.get("/orders/by-user/{uid}", response_model=List[OrderOut])
@@ -988,7 +988,7 @@ async def delete_order(
     # Check if the post exists
     post = await posts_col(db, group_id).find_one({"_id": post_id})
     if not post:
-        raise HTTPException(404, "Post not found")
+        raise HTTPException(404, "Không tìm thấy bài viết")
 
     # Check if the order exists
     order_exists = False
@@ -998,7 +998,7 @@ async def delete_order(
             break
 
     if not order_exists:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(404, "Không tìm thấy đơn hàng")
 
     # Remove the order from the post
     now = datetime.now(timezone.utc).isoformat()
@@ -1011,6 +1011,6 @@ async def delete_order(
     )
 
     if result.modified_count == 0:
-        raise HTTPException(404, "Order not found or could not be deleted")
+        raise HTTPException(404, "Không tìm thấy đơn hàng hoặc không thể xóa")
 
-    return {"message": "Order deleted successfully"}
+    return {"message": "Xóa đơn hàng thành công"}
