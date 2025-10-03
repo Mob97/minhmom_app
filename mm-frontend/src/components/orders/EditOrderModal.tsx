@@ -14,8 +14,6 @@ import {
   getOrderCustomerUrl,
   getOrderQuantity,
   getOrderType,
-  getOrderCommentUrl,
-  getOrderCommentText,
   getOrderAddress,
   getOrderPhoneNumber,
   getOrderTotalPrice

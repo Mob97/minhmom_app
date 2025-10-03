@@ -4,7 +4,6 @@ import { useAppStore } from '@/store/app-store';
 import { useOrders, useStatuses, usePost, useUpdatePost } from '@/hooks/use-api';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, Plus, ExternalLink, Edit2, Trash2, Split } from 'lucide-react';
