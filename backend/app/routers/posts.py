@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from datetime import datetime, timezone
 from ..db import get_db, posts_col, statuses_col
-from ..schemas import PostPatch, PostOut, OrderIn, OrderOut, OrderStatusPatch, SplitOrderRequest, PaginatedResponse
+from ..schemas import PostPatch, PostOut, OrderIn, OrderOut, OrderUpdate, OrderStatusPatch, SplitOrderRequest, PaginatedResponse
 from ..auth import require_user_or_admin
 from ..utils import to_local_time, compute_min_cost
 import hashlib
@@ -658,7 +658,7 @@ async def update_order(
     group_id: str,
     post_id: str,
     order_id: str,
-    body: OrderIn,
+    body: OrderUpdate,
     current_user: dict = Depends(require_user_or_admin()),
     db=Depends(get_db)
 ):

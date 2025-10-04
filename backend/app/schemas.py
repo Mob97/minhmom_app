@@ -239,6 +239,39 @@ class OrderIn(BaseModel):
     user: Optional[OrderUserOut] = None
 
 
+class OrderUpdate(BaseModel):
+    """
+    Update an existing order. All fields are optional for partial updates.
+    """
+    # New structured fields
+    source: Optional[OrderSource] = None
+    customer: Optional[OrderCustomer] = None
+    delivery_info: Optional[OrderDeliveryInfo] = None
+    item: Optional[OrderItem] = None
+
+    # Legacy fields for backward compatibility
+    comment_id: Optional[str] = None
+    comment_url: Optional[str] = None
+    comment_text: Optional[str] = None
+    comment_created_time: Optional[str] = None
+
+    raw_url: Optional[str] = None
+    qty: Optional[float] = Field(None, ge=0.0)
+    type: Optional[str] = None
+    currency: Optional[str] = None
+
+    matched_item: Optional[Item] = None
+    price_calc: Optional[PriceCalc] = None
+
+    # Price fields for manual price setting
+    unit_price: Optional[float] = None
+    total_price: Optional[float] = None
+
+    status_code: Optional[str] = None
+    note: Optional[str] = None
+    user: Optional[OrderUserOut] = None
+
+
 class OrderOut(BaseModel):
     order_id: str
     parsed_at: Optional[str] = None
