@@ -572,7 +572,8 @@ async def update_order_status(
                         status_entry["at"] = to_local_time(status_entry["at"])
 
             return OrderOut(**o)
-        raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
+
+    raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
 
 
 @router.patch("/{post_id}/orders/{order_id}", response_model=OrderOut)
@@ -745,7 +746,8 @@ async def update_order(
                         status_entry["at"] = to_local_time(status_entry["at"])
 
             return OrderOut(**o)
-        raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
+
+    raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
 
 
 @router.post("/{post_id}/orders/{order_id}/split", response_model=List[OrderOut])

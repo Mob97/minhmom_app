@@ -123,7 +123,7 @@ async def get_user(
 @router.post("/", response_model=UserFull)
 async def create_user(
     body: UserIn,
-    current_user: dict = Depends(require_admin()),
+    current_user: dict = Depends(require_user_or_admin()),
     db=Depends(get_db)
 ):
     doc = body.model_dump()
@@ -150,7 +150,7 @@ async def create_user(
 async def update_user(
     uid: str,
     body: UserIn,
-    current_user: dict = Depends(require_admin()),
+    current_user: dict = Depends(require_user_or_admin()),
     db=Depends(get_db)
 ):
     doc = body.model_dump()
@@ -476,11 +476,7 @@ async def get_user_orders_with_stats(
 
     # Sort orders by comment_created_time (newest first) for consistent pagination
     # Use new structure source.comment_created_time if available, otherwise fall back to legacy comment_created_time
-    all_orders.sort(key=lambda x:
-        x["order"].get("source", {}).get("comment_created_time", "") or
-        x["order"].get("comment_created_time", ""),
-        reverse=True
-    )
+    all_orders.sort(key=lambda x: x["order"].get("source", {}).get("comment_created_time") or x["order"].get("comment_created_time") or "", reverse=True)
 
     # Apply pagination
     total_orders = len(all_orders)
