@@ -117,7 +117,7 @@ export const statusApi = {
   },
 
   create: async (data: CreateStatusRequest): Promise<Status> => {
-    const response: AxiosResponse<Status> = await apiClient.post('/statuses', data);
+    const response: AxiosResponse<Status> = await apiClient.post('/statuses/', data);
     return response.data;
   },
 
@@ -156,7 +156,7 @@ export const userApi = {
   },
 
   create: async (data: CreateUserRequest): Promise<User> => {
-    const response: AxiosResponse<User> = await apiClient.post('/users', data);
+    const response: AxiosResponse<User> = await apiClient.post('/users/', data);
     return response.data;
   },
 
