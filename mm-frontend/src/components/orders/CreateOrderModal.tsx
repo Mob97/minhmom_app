@@ -71,13 +71,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     return parseFloat(cleaned) || 0;
   };
 
-  // Auto-calculate prices when item or quantity changes
+  // Auto-calculate prices when item changes (not when quantity changes)
   useEffect(() => {
-    if (postData?.items && formData.selected_item_id && formData.qty) {
+    if (postData?.items && formData.selected_item_id) {
       const selectedItem = postData.items[parseInt(formData.selected_item_id)];
       if (selectedItem && selectedItem.prices) {
         // Calculate price based on quantity using the same logic as backend
-        const qty = parseInt(formData.qty);
+        const qty = parseInt(formData.qty) || 1;
         let calculatedPrice = 0;
 
         // Find the best price tier for the quantity
@@ -105,9 +105,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         }));
       }
     }
-  }, [postData, formData.selected_item_id, formData.qty]);
+  }, [postData, formData.selected_item_id]); // Removed formData.qty from dependencies
 
   // Recalculate total price when quantity changes (based on current unit price)
+  // This preserves the unit price that the user has set manually
   useEffect(() => {
     if (formData.qty && formData.unit_price && !isTypingTotalPrice) {
       const qty = parseFloat(formData.qty) || 0;
@@ -154,7 +155,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         }));
       }
     }
-  }, [open, postData, formData.selected_item_id, formData.qty, formData.unit_price, formData.total_price]);
+  }, [open, postData]); // Removed formData dependencies to only run when dialog opens
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -666,10 +667,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <Input
                   id="qty"
                   type="number"
-                  step="0.1"
+                  step="1"
                   value={formData.qty}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, qty: e.target.value })}
-                  placeholder="1.0"
+                  placeholder="1"
                   required
                 />
               </div>

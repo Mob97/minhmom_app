@@ -347,10 +347,10 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 <Input
                   id="qty"
                   type="number"
-                  step="0.1"
+                  step="1"
                   value={formData.qty}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, qty: e.target.value })}
-                  placeholder="1.0"
+                  placeholder="1"
                 />
               </div>
               <div className="grid gap-2">
