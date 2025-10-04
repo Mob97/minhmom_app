@@ -18,7 +18,8 @@ export const PostsScreen: React.FC = () => {
     postsSearchQuery,
     setPostsSearchQuery,
     setSelectedPostId,
-    setOrdersDrawerOpen
+    setOrdersDrawerOpen,
+    activeTab
   } = useAppStore();
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,6 +56,13 @@ export const PostsScreen: React.FC = () => {
     sort_by: sortConfig.field,
     sort_direction: sortConfig.direction || 'desc',
   });
+
+  // Refetch posts when the user navigates back to the posts screen
+  useEffect(() => {
+    if (activeTab === 'posts' && selectedGroupId) {
+      refetch();
+    }
+  }, [activeTab, selectedGroupId, refetch]);
 
   const posts = postsResponse?.data || [];
   const totalPages = postsResponse?.total_pages || 1;
@@ -175,13 +183,7 @@ export const PostsScreen: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="px-6 py-3">
-                    <SortableHeader
-                      field="created_time"
-                      sortConfig={sortConfig}
-                      onSort={handleSort}
-                    >
-                      {t.posts.itemName}
-                    </SortableHeader>
+                    {t.posts.itemName}
                   </TableHead>
                   <TableHead className="px-6 py-3">{t.posts.itemType}</TableHead>
                   <TableHead className="px-6 py-3">{t.common.description}</TableHead>
@@ -197,7 +199,7 @@ export const PostsScreen: React.FC = () => {
                   </TableHead>
                   <TableHead className="px-6 py-3">
                     <SortableHeader
-                      field="updated_time"
+                      field="orders_last_update_at"
                       sortConfig={sortConfig}
                       onSort={handleSort}
                     >
@@ -252,7 +254,7 @@ export const PostsScreen: React.FC = () => {
                       {formatDateTime(post.created_time)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-sm text-muted-foreground">
-                      {formatDateTime(post.updated_time)}
+                      {formatDateTime(post.orders_last_update_at)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right">
                       <Button
@@ -327,7 +329,7 @@ export const PostsScreen: React.FC = () => {
 
                 <div className="flex flex-col sm:flex-row sm:justify-between text-xs text-muted-foreground space-y-1 sm:space-y-0">
                   <span>Tạo: {formatDateTime(post.created_time)}</span>
-                  <span>Cập nhật: {formatDateTime(post.updated_time)}</span>
+                  <span>Cập nhật: {formatDateTime(post.orders_last_update_at)}</span>
                 </div>
               </div>
             ))}

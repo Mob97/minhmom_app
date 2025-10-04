@@ -91,13 +91,75 @@ async def list_posts(
         db_field = field_mapping.get(sort_by, sort_by)
         sort_direction_int = 1 if sort_direction == "asc" else -1
         sort_criteria.append((db_field, sort_direction_int))
-    else:
-        # Default sort by orders_last_update_at descending
-        sort_criteria.append(("orders_last_update_at", -1))
 
-    # Get paginated results with sorting
-    cur = col.find(query).sort(sort_criteria).skip(skip).limit(page_size)
-    docs = await cur.to_list(length=page_size)
+        # For orders_last_update_at sorting, add _id as secondary sort to handle null values
+        if db_field == "orders_last_update_at":
+            sort_criteria.append(("_id", sort_direction_int))
+    else:
+        # Default sort by orders_last_update_at descending, then by _id descending
+        # This ensures posts with orders appear first, then posts without orders by creation time
+        sort_criteria.append(("orders_last_update_at", -1))
+        sort_criteria.append(("_id", -1))
+
+    # Use simple find with sort for now to debug the issue
+    projection = {
+        "_id": 1,
+        "description": 1,
+        "items": 1,
+        "tags": 1,
+        "import_price": 1,
+        "orders_last_update_at": 1,
+        "created_time": 1,
+        "updated_time": 1,
+        "local_images": 1
+    }
+
+    # Try a different approach - sort by orders_last_update_at with nulls last
+    if not sort_by or sort_by == "orders_last_update_at":
+        # Use aggregation to handle null values and data type inconsistencies
+        pipeline = []
+        if query:
+            pipeline.append({"$match": query})
+
+        pipeline.append({
+            "$addFields": {
+                "sort_orders_last_update_at": {
+                    "$ifNull": [
+                        {
+                            "$dateFromString": {
+                                "dateString": {
+                                    "$cond": {
+                                        "if": {"$eq": [{"$type": "$orders_last_update_at"}, "string"]},
+                                        "then": "$orders_last_update_at",
+                                        "else": {"$dateToString": {"date": "$orders_last_update_at"}}
+                                    }
+                                },
+                                "onError": "1970-01-01T00:00:00Z"
+                            }
+                        },
+                        {"$dateFromString": {"dateString": "1970-01-01T00:00:00Z"}}
+                    ]
+                }
+            }
+        })
+
+        pipeline.append({
+            "$sort": {
+                "sort_orders_last_update_at": -1,
+                "_id": -1
+            }
+        })
+
+        pipeline.append({"$skip": skip})
+        pipeline.append({"$limit": page_size})
+
+        pipeline.append({"$project": projection})
+
+        docs = await col.aggregate(pipeline).to_list(length=page_size)
+    else:
+        # Use regular find for other sort fields
+        cur = col.find(query, projection).sort(sort_criteria).skip(skip).limit(page_size)
+        docs = await cur.to_list(length=page_size)
 
     out: List[PostOut] = []
     user_role = current_user.get("role", "user")
@@ -435,7 +497,7 @@ async def create_order(
         f"{post_id}:{comment_id}:{user_uid}:{now_timestamp}".encode("utf-8")
     ).hexdigest()
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
     # 9) Build the new order structure
     order_doc = {
@@ -526,7 +588,7 @@ async def update_order_status(
     if not st:
         raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.new_status_code}")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
     res = await posts_col(db, group_id).update_one(
         {"_id": post_id, "orders.order_id": order_id},
         {
@@ -606,7 +668,7 @@ async def update_order(
     if not existing_order:
         raise HTTPException(404, "Không tìm thấy đơn hàng")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
     # Get post items for price recalculation if needed
     items = post.get("items") or []
@@ -794,7 +856,7 @@ async def split_order(
         raise HTTPException(400, "Số lượng chia phải lớn hơn 0")
 
     remaining_qty = original_qty - body.split_quantity
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
     try:
         # Create the new order
@@ -1003,7 +1065,7 @@ async def delete_order(
         raise HTTPException(404, "Không tìm thấy đơn hàng")
 
     # Remove the order from the post
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
     result = await posts_col(db, group_id).update_one(
         {"_id": post_id},
         {

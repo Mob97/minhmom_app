@@ -201,7 +201,16 @@ export const useCreateOrder = () => {
       orderApi.create(groupId, postId, data),
     onSuccess: (_, { groupId, postId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.orders(groupId, postId) });
-      queryClient.invalidateQueries({ queryKey: ['posts', groupId] });
+      // Invalidate all posts queries for this group
+      queryClient.invalidateQueries({
+        queryKey: ['posts', groupId],
+        exact: false
+      });
+      // Force refetch of posts to ensure the updated post appears
+      queryClient.refetchQueries({
+        queryKey: ['posts', groupId],
+        exact: false
+      });
     },
   });
 };
@@ -227,6 +236,11 @@ export const useUpdateOrder = () => {
       queryClient.invalidateQueries({ queryKey: ['all-orders', groupId] });
       queryClient.invalidateQueries({ queryKey: ['user-orders-with-stats'] });
       queryClient.invalidateQueries({ queryKey: ['users-with-orders'] });
+      // Invalidate all posts queries for this group
+      queryClient.invalidateQueries({
+        queryKey: ['posts', groupId],
+        exact: false
+      });
     },
   });
 };
@@ -252,6 +266,11 @@ export const useUpdateOrderStatus = () => {
       queryClient.invalidateQueries({ queryKey: ['all-orders', groupId] });
       queryClient.invalidateQueries({ queryKey: ['user-orders-with-stats'] });
       queryClient.invalidateQueries({ queryKey: ['users-with-orders'] });
+      // Invalidate all posts queries for this group
+      queryClient.invalidateQueries({
+        queryKey: ['posts', groupId],
+        exact: false
+      });
     },
   });
 };
@@ -305,6 +324,11 @@ export const useDeleteOrder = () => {
       queryClient.invalidateQueries({ queryKey: ['all-orders', groupId] });
       queryClient.invalidateQueries({ queryKey: ['user-orders-with-stats'] });
       queryClient.invalidateQueries({ queryKey: ['users-with-orders'] });
+      // Invalidate all posts queries for this group
+      queryClient.invalidateQueries({
+        queryKey: ['posts', groupId],
+        exact: false
+      });
     },
   });
 };
@@ -321,6 +345,11 @@ export const useSplitOrder = () => {
       queryClient.invalidateQueries({ queryKey: ['all-orders', groupId] });
       queryClient.invalidateQueries({ queryKey: ['user-orders-with-stats'] });
       queryClient.invalidateQueries({ queryKey: ['users-with-orders'] });
+      // Invalidate all posts queries for this group
+      queryClient.invalidateQueries({
+        queryKey: ['posts', groupId],
+        exact: false
+      });
     },
   });
 };
