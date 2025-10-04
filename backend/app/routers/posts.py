@@ -12,6 +12,35 @@ import math
 router = APIRouter(prefix="/groups/{group_id}/posts", tags=["Posts & Orders"])
 
 
+def convert_order_datetime_to_string(order_data: dict) -> dict:
+    """
+    Convert datetime objects in order data to strings for API response.
+    """
+    converted = order_data.copy()
+
+    # Convert parsed_at if it's a datetime object
+    if 'parsed_at' in converted and isinstance(converted['parsed_at'], datetime):
+        converted['parsed_at'] = converted['parsed_at'].isoformat()
+
+    # Convert status_history at fields if they exist
+    if 'status_history' in converted and isinstance(converted['status_history'], list):
+        for status in converted['status_history']:
+            if isinstance(status, dict) and 'at' in status and isinstance(status['at'], datetime):
+                status['at'] = status['at'].isoformat()
+
+    # Convert source comment_created_time if it exists
+    if 'source' in converted and converted['source'] and isinstance(converted['source'], dict):
+        if 'comment_created_time' in converted['source'] and isinstance(converted['source']['comment_created_time'], datetime):
+            converted['source']['comment_created_time'] = converted['source']['comment_created_time'].isoformat()
+
+    # Convert customer created_date if it exists
+    if 'customer' in converted and converted['customer'] and isinstance(converted['customer'], dict):
+        if 'created_date' in converted['customer'] and isinstance(converted['customer']['created_date'], datetime):
+            converted['customer']['created_date'] = converted['customer']['created_date'].isoformat()
+
+    return converted
+
+
 def construct_image_urls(local_images: List[dict]) -> List[str]:
     """
     Construct image URLs from local_images metadata by joining base_path with local_path.
@@ -571,7 +600,7 @@ async def create_order(
             "$set": {"orders_last_update_at": now},
         },
     )
-    return order_doc
+    return convert_order_datetime_to_string(order_doc)
 
 
 @router.patch("/{post_id}/orders/{order_id}/status", response_model=OrderOut)
@@ -613,27 +642,13 @@ async def update_order_status(
     d = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
     for o in d.get("orders") or []:
         if o.get("order_id") == order_id:
-            # Convert parsed_at to local time string
-            o["parsed_at"] = to_local_time(o.get("parsed_at"))
+            # Convert datetime objects to strings for API response
+            converted_order = convert_order_datetime_to_string(o)
 
             # Convert legacy comment_created_time to local time string
-            o["comment_created_time"] = to_local_time(o.get("comment_created_time"))
+            converted_order["comment_created_time"] = to_local_time(converted_order.get("comment_created_time"))
 
-            # Convert new structure datetime fields to strings
-            if "source" in o and o["source"]:
-                if "comment_created_time" in o["source"]:
-                    o["source"]["comment_created_time"] = to_local_time(o["source"]["comment_created_time"])
-
-            if "customer" in o and o["customer"]:
-                if "created_date" in o["customer"]:
-                    o["customer"]["created_date"] = to_local_time(o["customer"]["created_date"])
-
-            if "status_history" in o and o["status_history"]:
-                for status_entry in o["status_history"]:
-                    if "at" in status_entry:
-                        status_entry["at"] = to_local_time(status_entry["at"])
-
-            return OrderOut(**o)
+            return OrderOut(**converted_order)
 
     raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
 
@@ -787,27 +802,13 @@ async def update_order(
     d = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
     for o in d.get("orders") or []:
         if o.get("order_id") == order_id:
-            # Convert parsed_at to local time string
-            o["parsed_at"] = to_local_time(o.get("parsed_at"))
+            # Convert datetime objects to strings for API response
+            converted_order = convert_order_datetime_to_string(o)
 
             # Convert legacy comment_created_time to local time string
-            o["comment_created_time"] = to_local_time(o.get("comment_created_time"))
+            converted_order["comment_created_time"] = to_local_time(converted_order.get("comment_created_time"))
 
-            # Convert new structure datetime fields to strings
-            if "source" in o and o["source"]:
-                if "comment_created_time" in o["source"]:
-                    o["source"]["comment_created_time"] = to_local_time(o["source"]["comment_created_time"])
-
-            if "customer" in o and o["customer"]:
-                if "created_date" in o["customer"]:
-                    o["customer"]["created_date"] = to_local_time(o["customer"]["created_date"])
-
-            if "status_history" in o and o["status_history"]:
-                for status_entry in o["status_history"]:
-                    if "at" in status_entry:
-                        status_entry["at"] = to_local_time(status_entry["at"])
-
-            return OrderOut(**o)
+            return OrderOut(**converted_order)
 
     raise HTTPException(404, "Không tìm thấy đơn hàng sau khi cập nhật")
 
@@ -943,24 +944,13 @@ async def split_order(
         orders = []
         for order in updated_post.get("orders", []):
             if order.get("order_id") in [order_id, new_order_id]:
-                # Convert datetime fields to local time strings
-                order["parsed_at"] = to_local_time(order.get("parsed_at"))
-                order["comment_created_time"] = to_local_time(order.get("comment_created_time"))
+                # Convert datetime objects to strings for API response
+                converted_order = convert_order_datetime_to_string(order)
 
-                if "source" in order and order["source"]:
-                    if "comment_created_time" in order["source"]:
-                        order["source"]["comment_created_time"] = to_local_time(order["source"]["comment_created_time"])
+                # Convert legacy comment_created_time to local time string
+                converted_order["comment_created_time"] = to_local_time(converted_order.get("comment_created_time"))
 
-                if "customer" in order and order["customer"]:
-                    if "created_date" in order["customer"]:
-                        order["customer"]["created_date"] = to_local_time(order["customer"]["created_date"])
-
-                if "status_history" in order and order["status_history"]:
-                    for status_entry in order["status_history"]:
-                        if "at" in status_entry:
-                            status_entry["at"] = to_local_time(status_entry["at"])
-
-                orders.append(OrderOut(**order))
+                orders.append(OrderOut(**converted_order))
 
         return orders
 
@@ -1013,27 +1003,13 @@ async def get_orders_by_user(
 
             order_url = order.get("url", "")
             if user_fb_uid == uid or order_url.endswith(f"/{uid}"):
-                # Convert parsed_at to local time string
-                order["parsed_at"] = to_local_time(order.get("parsed_at"))
+                # Convert datetime objects to strings for API response
+                converted_order = convert_order_datetime_to_string(order)
 
                 # Convert legacy comment_created_time to local time string
-                order["comment_created_time"] = to_local_time(order.get("comment_created_time"))
+                converted_order["comment_created_time"] = to_local_time(converted_order.get("comment_created_time"))
 
-                # Convert new structure datetime fields to strings
-                if "source" in order and order["source"]:
-                    if "comment_created_time" in order["source"]:
-                        order["source"]["comment_created_time"] = to_local_time(order["source"]["comment_created_time"])
-
-                if "customer" in order and order["customer"]:
-                    if "created_date" in order["customer"]:
-                        order["customer"]["created_date"] = to_local_time(order["customer"]["created_date"])
-
-                if "status_history" in order and order["status_history"]:
-                    for status_entry in order["status_history"]:
-                        if "at" in status_entry:
-                            status_entry["at"] = to_local_time(status_entry["at"])
-
-                all_orders.append(OrderOut(**order))
+                all_orders.append(OrderOut(**converted_order))
 
     return all_orders
 
