@@ -721,11 +721,14 @@ async def update_order(
     if body.user is not None:
         update_data["orders.$[o].user"] = body.user.model_dump()
 
-    # Handle new price fields
+    # Handle manual price fields (these override automatic calculation)
+    manual_prices_set = False
     if body.unit_price is not None:
         update_data["orders.$[o].item.unit_price"] = body.unit_price
+        manual_prices_set = True
     if body.total_price is not None:
         update_data["orders.$[o].item.total_price"] = body.total_price
+        manual_prices_set = True
 
     # Handle item selection
     if body.item is not None:
@@ -739,34 +742,58 @@ async def update_order(
             update_data["orders.$[o].item.qty"] = body.item.qty
         if body.item.unit_price is not None:
             update_data["orders.$[o].item.unit_price"] = body.item.unit_price
+            manual_prices_set = True
         if body.item.total_price is not None:
             update_data["orders.$[o].item.total_price"] = body.item.total_price
+            manual_prices_set = True
 
-    # Recalculate price if qty or type changed
-    if (body.qty is not None or body.type is not None) and items:
+    # Recalculate price if qty, type, or item selection changed (but not if manual prices were set)
+    # This ensures that when users change quantity or select different items, prices are automatically recalculated
+    # However, if they manually set unit_price or total_price, we respect those values instead
+    should_recalculate = (not manual_prices_set and
+                          (body.qty is not None or body.type is not None or
+                           (body.item and body.item.item_id is not None)) and items)
+    if should_recalculate:
         # Get current order to determine what to recalculate
         current_qty = existing_order.get("qty", body.qty or 1)
+        current_item_id = existing_order.get("item", {}).get("item_id", 0)
 
         # Use updated values
         new_qty = body.qty if body.qty is not None else current_qty
+        new_item_id = body.item.item_id if body.item and body.item.item_id is not None else current_item_id
 
         # Use selected item or first item for price calculation
         chosen_item = None
-        if body.item and body.item.item_id is not None and 0 <= body.item.item_id < len(items):
-            chosen_item = items[body.item.item_id]
+        if 0 <= new_item_id < len(items):
+            chosen_item = items[new_item_id]
         else:
             chosen_item = items[0] if items else None
 
         if chosen_item:
             price_info = compute_min_cost(chosen_item.get("prices") or [], int(new_qty))
+
             # Update item structure with calculated prices
+            update_data["orders.$[o].item.item_id"] = new_item_id
             update_data["orders.$[o].item.item_name"] = chosen_item.get("name")
             update_data["orders.$[o].item.item_type"] = chosen_item.get("type")
             update_data["orders.$[o].item.unit_price"] = price_info.get("total", 0) / new_qty if new_qty > 0 else 0
             update_data["orders.$[o].item.total_price"] = price_info.get("total", 0)
             update_data["orders.$[o].item.price_calculation"] = price_info
-            # Ensure item.qty is updated with the new quantity
             update_data["orders.$[o].item.qty"] = new_qty
+
+            # Update legacy fields for backward compatibility
+            update_data["orders.$[o].qty"] = new_qty
+            update_data["orders.$[o].type"] = chosen_item.get("type")
+            update_data["orders.$[o].matched_item"] = {
+                "name": chosen_item.get("name"),
+                "type": chosen_item.get("type"),
+                "prices": chosen_item.get("prices", [])
+            }
+            update_data["orders.$[o].price_calc"] = price_info
+
+            # Also update the top-level unit_price and total_price for consistency
+            update_data["orders.$[o].unit_price"] = price_info.get("total", 0) / new_qty if new_qty > 0 else 0
+            update_data["orders.$[o].total_price"] = price_info.get("total", 0)
 
     # Update the order
     # First, update the order data
