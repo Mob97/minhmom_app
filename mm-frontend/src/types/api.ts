@@ -151,11 +151,17 @@ export interface Post {
   description?: string;
   items: PostItem[];
   tags: string[];
-  import_price?: number;
   orders_last_update_at?: string;
   local_images?: string[];
   created_time?: string;
   updated_time?: string;
+}
+
+export interface StockHistoryEntry {
+  quantity: number;
+  note?: string;
+  images?: string[];
+  created_at?: string;
 }
 
 export interface PostItem {
@@ -163,6 +169,8 @@ export interface PostItem {
   type?: string;
   prices: PricePack[];
   stock_quantity?: number;
+  stock_history?: StockHistoryEntry[];
+  import_price?: number;
 }
 
 export interface PricePack {
@@ -174,7 +182,6 @@ export interface UpdatePostRequest {
   description?: string;
   items?: PostItem[];
   tags?: string[];
-  import_price?: number;
 }
 
 // Order types

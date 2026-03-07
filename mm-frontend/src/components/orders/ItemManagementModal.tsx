@@ -5,9 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Edit2, Trash2, X, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { PostItem, PricePack } from '@/types/api';
+import { imageApi } from '@/lib/api-client';
+import { ImageGallery } from '@/components/ui/image-gallery';
+import type { PostItem, PricePack, StockHistoryEntry } from '@/types/api';
 
 interface ItemManagementModalProps {
   open: boolean;
@@ -15,6 +18,9 @@ interface ItemManagementModalProps {
   items: PostItem[];
   onSave: (items: PostItem[]) => void;
   loading?: boolean;
+  isAdmin?: boolean;
+  groupId?: string;
+  postId?: string;
 }
 
 interface EditableItem extends PostItem {
@@ -25,17 +31,30 @@ interface EditablePricePack extends PricePack {
   // No id field - using qty as identifier
 }
 
+function computedStock(item: PostItem): number {
+  const history = item.stock_history || [];
+  return history.reduce((s, e) => s + (e.quantity ?? 0), 0);
+}
+
 export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
   open,
   onOpenChange,
   items,
   onSave,
-  loading = false
+  loading = false,
+  isAdmin = false,
+  groupId = '',
+  postId = ''
 }) => {
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
   const [editingItem, setEditingItem] = useState<EditableItem | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [stockFormItemIndex, setStockFormItemIndex] = useState<number | null>(null);
+  const [stockFormQuantity, setStockFormQuantity] = useState('');
+  const [stockFormNote, setStockFormNote] = useState('');
+  const [stockFormFiles, setStockFormFiles] = useState<File[]>([]);
+  const [stockFormUploading, setStockFormUploading] = useState(false);
   const prevOpenRef = useRef(false);
   const { toast } = useToast();
 
@@ -59,7 +78,8 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
         qty: 1,
         bundle_price: 0
       }],
-      stock_quantity: undefined
+      stock_quantity: undefined,
+      import_price: undefined
     };
     const newIndex = editableItems.length;
     setEditableItems([...editableItems, newItem]);
@@ -169,7 +189,8 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
       name: item.name,
       type: item.type,
       prices: item.prices,
-      stock_quantity: item.stock_quantity
+      stock_quantity: item.stock_quantity,
+      import_price: item.import_price
     }));
 
     onSave(itemsToSave);
@@ -209,6 +230,11 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                         {item.stock_quantity != null && (
                           <span className="text-sm text-muted-foreground">
                             · Tồn: {item.stock_quantity}
+                          </span>
+                        )}
+                        {isAdmin && item.import_price != null && item.import_price > 0 && (
+                          <span className="text-sm text-muted-foreground">
+                            · Giá nhập: {formatCurrency(item.import_price)}
                           </span>
                         )}
                       </div>
@@ -310,6 +336,23 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                       placeholder="Để trống = không giới hạn"
                     />
                   </div>
+                  {isAdmin && (
+                    <div>
+                      <Label htmlFor="item-import-price">Giá nhập (VND)</Label>
+                      <Input
+                        id="item-import-price"
+                        type="number"
+                        min={0}
+                        step={1000}
+                        value={editingItem.import_price ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          handleUpdateItemField('import_price', v === '' ? undefined : Math.max(0, parseFloat(v) || 0));
+                        }}
+                        placeholder="Để trống = 0"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>

@@ -70,15 +70,59 @@ def construct_image_urls(local_images: List[dict]) -> List[str]:
     return image_urls
 
 
+def items_with_computed_stock(items: list) -> list:
+    """For each item, set stock_quantity = sum of stock_history quantities (source of truth)."""
+    if not items:
+        return items
+    result = []
+    for it in items:
+        if not isinstance(it, dict):
+            result.append(it)
+            continue
+        item = it.copy()
+        history = item.get("stock_history") or []
+        total = sum(entry.get("quantity") or 0 for entry in history)
+        item["stock_quantity"] = total
+        result.append(item)
+    return result
+
+
+def normalize_items_for_save(items: list) -> list:
+    """Strip stock_quantity from each item (not persisted); set created_at on new stock_history entries."""
+    if not items:
+        return items
+    now_iso = datetime.now(timezone.utc).isoformat()
+    result = []
+    for it in items:
+        if not isinstance(it, dict):
+            result.append(it)
+            continue
+        item = it.copy()
+        item.pop("stock_quantity", None)  # do not persist; computed from stock_history
+        history = item.get("stock_history") or []
+        if history:
+            new_history = []
+            for entry in history:
+                e = dict(entry) if isinstance(entry, dict) else entry
+                if isinstance(e, dict) and not e.get("created_at"):
+                    e["created_at"] = now_iso
+                new_history.append(e)
+            item["stock_history"] = new_history
+        result.append(item)
+    return result
+
+
 def filter_import_price_for_user(post_data: dict, user_role: str) -> dict:
     """
-    Filter import_price field based on user role.
-    Only admin users can see import_price.
+    Filter import_price based on user role. Only admin can see it.
+    Removes post-level import_price (legacy) and item.import_price for non-admin.
     """
+    if "import_price" in post_data:
+        del post_data["import_price"]
     if user_role != "admin":
-        # Remove import_price for non-admin users
-        if "import_price" in post_data:
-            del post_data["import_price"]
+        for item in post_data.get("items") or []:
+            if isinstance(item, dict) and "import_price" in item:
+                del item["import_price"]
     return post_data
 
 
@@ -136,7 +180,6 @@ async def list_posts(
         "description": 1,
         "items": 1,
         "tags": 1,
-        "import_price": 1,
         "orders_last_update_at": 1,
         "created_time": 1,
         "updated_time": 1,
@@ -215,12 +258,12 @@ async def list_posts(
         local_images_data = filtered_d.get("local_images") or []
         image_urls = construct_image_urls(local_images_data)
 
+        items = items_with_computed_stock(filtered_d.get("items") or [])
         out.append(PostOut(
             id=str(filtered_d.get("_id")),
             description=filtered_d.get("description"),
-            items=filtered_d.get("items") or [],
+            items=items,
             tags=filtered_d.get("tags") or [],
-            import_price=filtered_d.get("import_price"),
             orders_last_update_at=orders_last_update_at,
             local_images=image_urls,  # Now contains constructed URLs instead of raw metadata
             created_time=created_time,
@@ -353,12 +396,12 @@ async def get_post(
     local_images_data = filtered_d.get("local_images") or []
     image_urls = construct_image_urls(local_images_data)
 
+    items = items_with_computed_stock(filtered_d.get("items") or [])
     return PostOut(
         id=str(filtered_d.get("_id")),
         description=filtered_d.get("description"),
-        items=filtered_d.get("items") or [],
+        items=items,
         tags=filtered_d.get("tags") or [],
-        import_price=filtered_d.get("import_price"),
         orders_last_update_at=orders_last_update_at,
         local_images=image_urls,  # Now contains constructed URLs instead of raw metadata
     )
@@ -374,12 +417,15 @@ async def patch_post(
 ):
     update = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
 
-    # Check if user is trying to modify import_price without admin privileges
-    if "import_price" in update and current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only admin users can modify import_price"
-        )
+    # Non-admin cannot send item.import_price when updating items
+    if "items" in update and current_user.get("role") != "admin":
+        for item in update["items"]:
+            if isinstance(item, dict) and "import_price" in item:
+                del item["import_price"]
+
+    # Do not persist stock_quantity; set created_at on new stock_history entries
+    if "items" in update:
+        update["items"] = normalize_items_for_save(update["items"])
 
     if not update:
         raise HTTPException(400, "Không có trường nào để cập nhật")
@@ -400,12 +446,12 @@ async def patch_post(
     local_images_data = filtered_d.get("local_images") or []
     image_urls = construct_image_urls(local_images_data)
 
+    items = items_with_computed_stock(filtered_d.get("items") or [])
     return PostOut(
         id=str(filtered_d.get("_id")),
         description=filtered_d.get("description"),
-        items=filtered_d.get("items") or [],
+        items=items,
         tags=filtered_d.get("tags") or [],
-        import_price=filtered_d.get("import_price"),
         orders_last_update_at=orders_last_update_at,
         local_images=image_urls,  # Now contains constructed URLs instead of raw metadata
     )

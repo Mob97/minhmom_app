@@ -29,12 +29,22 @@ class PriceCalc(BaseModel):
     packs: List[PriceCalcPack] = Field(default_factory=list)
 
 
+class StockHistoryEntry(BaseModel):
+    """One stock intake batch: quantity, optional note and images."""
+    quantity: int = Field(ge=0)
+    note: Optional[str] = None
+    images: Optional[List[str]] = None
+    created_at: Optional[str] = None  # ISO datetime; backend can set when missing
+
+
 class Item(BaseModel):
     """Extracted product option from a post description."""
     name: Optional[str] = None
     type: Optional[str] = None
     prices: List[PricePack] = Field(default_factory=list)
-    stock_quantity: Optional[int] = Field(default=None, ge=0)
+    stock_quantity: Optional[int] = Field(default=None, ge=0)  # output only: computed from stock_history
+    stock_history: Optional[List[StockHistoryEntry]] = None
+    import_price: Optional[float] = Field(default=None, ge=0)
 
 
 # =========================
@@ -143,7 +153,6 @@ class PostPatch(BaseModel):
     description: Optional[str] = None
     items: Optional[List[Item]] = None
     tags: Optional[List[str]] = None
-    import_price: Optional[float] = None
 
 
 class PostOut(BaseModel):
@@ -151,7 +160,6 @@ class PostOut(BaseModel):
     description: Optional[str] = None
     items: List[Item] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
-    import_price: Optional[float] = None
     orders_last_update_at: Optional[str] = None
     local_images: List[str] = Field(default_factory=list)
     created_time: Optional[str] = None

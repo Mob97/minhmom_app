@@ -42,15 +42,13 @@ async def get_dashboard_data(
     })
     posts = await posts_cursor.to_list(length=None)
 
-    # Extract all orders from posts
+    # Extract all orders from posts; keep post_by_id to resolve item.import_price per order
     all_orders = []
-    post_import_prices = {}
+    post_by_id = {post["_id"]: post for post in posts}
 
     for post in posts:
-        post_import_prices[post["_id"]] = post.get("import_price", 0)
         orders = post.get("orders", [])
         for order in orders:
-            # Add post_id to each order for reference
             order["post_id"] = post["_id"]
             all_orders.append(order)
 
@@ -111,37 +109,36 @@ async def get_dashboard_data(
         # Calculate revenue (order total - import price) - exclude CANCELLED orders
         status = order.get("status_code", "NEW")
 
-        # Only calculate revenue and income for non-CANCELLED orders with available import_price
+        # Only calculate revenue and income for non-CANCELLED orders
         if status != "CANCELLED":
             order_total = 0
-            # Use new structure total_price if available, otherwise fall back to legacy price_calc
             if order.get("item") and order["item"].get("total_price"):
                 order_total = order["item"]["total_price"]
             elif order.get("price_calc") and order["price_calc"].get("total"):
                 order_total = order["price_calc"]["total"]
 
+            # Import cost from item.import_price (per unit) * order qty
             post_id = order.get("post_id")
-            import_price = post_import_prices.get(post_id, 0) if post_id else 0
+            post = post_by_id.get(post_id) if post_id else None
+            items = post.get("items", []) if post else []
+            item_id = order.get("item", {}).get("item_id") if order.get("item") else None
+            qty = (order.get("item") or {}).get("qty") or order.get("qty") or 0
+            if item_id is not None and 0 <= item_id < len(items):
+                unit_import = items[item_id].get("import_price") or 0
+            else:
+                unit_import = 0
+            import_cost = unit_import * (qty if qty else 0)
 
-            # Only calculate revenue and income if import_price is available (not 0 or None)
-            if import_price > 0 and order_total > 0:
-                # Calculate income (total order value)
+            if order_total > 0:
                 total_income += order_total
                 monthly_income_data[order_month - 1]["income"] += order_total
-
-                # Add to current month income
                 if order_month == current_month:
                     monthly_income += order_total
 
-                # Calculate revenue (order total - import price)
-                if order_total > import_price:
-                    revenue = order_total - import_price
+                revenue = order_total - import_cost
+                if revenue > 0:
                     total_revenue += revenue
-
-                    # Add to monthly revenue
                     monthly_revenue_data[order_month - 1]["revenue"] += revenue
-
-                    # Add to current month revenue
                     if order_month == current_month:
                         monthly_revenue += revenue
 

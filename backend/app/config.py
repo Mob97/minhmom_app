@@ -16,6 +16,7 @@ class ImageConfig(BaseModel):
     posts_dir: str = "posts"
     comments_dir: str = "comments"
     orders_dir: str = "orders"
+    stock_dir: str = "stock"
     allowed_extensions: List[str] = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
     max_file_size_mb: int = 10
 

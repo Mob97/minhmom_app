@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { RefreshCw, Plus, ExternalLink, Edit2, Trash2, Split } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { RefreshCw, Plus, ExternalLink, Edit2, Trash2, Split, ShoppingCart } from 'lucide-react';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
 import { DeleteOrderDialog } from './DeleteOrderDialog';
@@ -18,7 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useUpdateOrderStatus, useUpdateOrder, useCreateOrder, useDeleteOrder, useSplitOrder } from '@/hooks/use-api';
 import { ImageGallery } from '@/components/ui/image-gallery';
 import { useAuth } from '@/contexts/AuthContext';
-import { Input } from '@/components/ui/input';
 import type { Order } from '@/types/api';
 import {
   getOrderCustomerName,
@@ -74,8 +74,6 @@ export const OrdersDrawer: React.FC = () => {
     return statuses?.find((s: any) => s.display_name === displayName)?.status_code;
   };
 
-  const [isEditingImportPrice, setIsEditingImportPrice] = useState(false);
-  const [importPriceValue, setImportPriceValue] = useState('');
   const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDeleteOrderDialogOpen, setIsDeleteOrderDialogOpen] = useState(false);
@@ -87,6 +85,7 @@ export const OrdersDrawer: React.FC = () => {
   const [showBatchUpdateDialog, setShowBatchUpdateDialog] = useState(false);
   const [ordersToUpdate, setOrdersToUpdate] = useState<Order[]>([]);
   const [newStatusCode, setNewStatusCode] = useState<string>('');
+  const [isNewOrdersDialogOpen, setIsNewOrdersDialogOpen] = useState(false);
 
   const filteredOrders = (orders?.filter((order: Order) =>
     !ordersStatusFilter || ordersStatusFilter === "all" || order.status_code === ordersStatusFilter
@@ -104,20 +103,27 @@ export const OrdersDrawer: React.FC = () => {
   });
 
 
-  // Calculate total revenue (order total - import price * total quantity)
+  // Total revenue from items: sum(order total) - sum(item.import_price * qty per order)
   const calculateTotalRevenue = () => {
-    if (!filteredOrders || !post?.import_price) return 0;
+    if (!filteredOrders || !post?.items?.length) return 0;
 
-    const totalOrderValue = filteredOrders.reduce((sum, order) => {
-      return sum + getOrderTotalPrice(order);
-    }, 0);
+    let totalOrderValue = 0;
+    let totalImportCost = 0;
 
-    const totalQuantity = filteredOrders.reduce((sum, order) => {
-      return sum + getOrderQuantity(order);
-    }, 0);
+    for (const order of filteredOrders) {
+      const orderTotal = getOrderTotalPrice(order);
+      const qty = getOrderQuantity(order);
+      totalOrderValue += orderTotal;
 
-    const importPrice = post.import_price || 0;
-    const totalImportCost = importPrice * totalQuantity;
+      const itemId = order.item?.item_id;
+      const items = post.items;
+      const unitImport =
+        itemId != null && itemId >= 0 && itemId < items.length
+          ? (items[itemId].import_price ?? 0)
+          : 0;
+      totalImportCost += unitImport * (qty || 0);
+    }
+
     return Math.max(0, totalOrderValue - totalImportCost);
   };
 
@@ -138,56 +144,8 @@ export const OrdersDrawer: React.FC = () => {
   };
 
   const newOrdersByType = calculateNewOrdersByType();
-
-  const handleEditImportPrice = () => {
-    setImportPriceValue(post?.import_price?.toString() || '');
-    setIsEditingImportPrice(true);
-  };
-
-  const handleSaveImportPrice = async () => {
-    if (!selectedGroupId || !selectedPostId) return;
-
-    const numericValue = parseFloat(importPriceValue);
-    if (isNaN(numericValue) && importPriceValue !== '') {
-      toast({
-        title: 'Error',
-        description: 'Please enter a valid number',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    updatePostMutation.mutate(
-      {
-        groupId: selectedGroupId,
-        postId: selectedPostId,
-        data: {
-          import_price: importPriceValue === '' ? undefined : numericValue
-        }
-      },
-      {
-        onSuccess: () => {
-          setIsEditingImportPrice(false);
-          toast({
-        title: 'Thành công',
-        description: 'Cập nhật giá nhập thành công',
-          });
-        },
-        onError: (error: any) => {
-          toast({
-        title: 'Lỗi',
-        description: typeof error.detail === 'string' ? error.detail : 'Không thể cập nhật giá nhập',
-            variant: 'destructive',
-          });
-        }
-      }
-    );
-  };
-
-  const handleCancelEditImportPrice = () => {
-    setIsEditingImportPrice(false);
-    setImportPriceValue('');
-  };
+  const newOrders = (filteredOrders || []).filter((o: Order) => o.status_code === 'NEW');
+  const totalNewQuantity = Object.values(newOrdersByType).reduce((a, b) => a + b, 0);
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     if (!selectedGroupId || !selectedPostId) return;
@@ -483,7 +441,16 @@ export const OrdersDrawer: React.FC = () => {
               <div className="flex-1">
                 <div className="flex items-center space-x-4">
                   <div>
-                    <DrawerTitle className="text-lg sm:text-xl">Đơn hàng - Post #{selectedPostId}</DrawerTitle>
+                    <DrawerTitle
+                      className="text-lg sm:text-xl cursor-pointer hover:underline hover:text-primary"
+                      onClick={() => {
+                        if (selectedGroupId && selectedPostId) {
+                          window.open(`https://www.facebook.com/groups/${selectedGroupId}/posts/${selectedPostId}/`, '_blank');
+                        }
+                      }}
+                    >
+                      {post?.items?.[0]?.name || `Đơn hàng - Post #${selectedPostId}`}
+                    </DrawerTitle>
                     <DrawerDescription className="text-sm">
                       {filteredOrders.length} {t.common.order.toLowerCase()}
                     </DrawerDescription>
@@ -507,62 +474,6 @@ export const OrdersDrawer: React.FC = () => {
                   </div>
                 ) : post ? (
                   <div className="mt-4 space-y-3">
-                    {/* Import Price - Admin Only */}
-                    {isAdmin && (
-                      <div className="flex items-center space-x-2">
-                        <h4 className="text-sm font-medium text-muted-foreground">Giá nhập:</h4>
-                        {isEditingImportPrice ? (
-                          <>
-                            <Input
-                              type="number"
-                              value={importPriceValue}
-                              onChange={(e) => setImportPriceValue(e.target.value)}
-                              placeholder="Enter import price"
-                              className="h-8 text-sm w-32"
-                            />
-                            <Button
-                              size="sm"
-                              onClick={handleSaveImportPrice}
-                              className="h-8 px-3"
-                              disabled={updatePostMutation.isPending}
-                            >
-                              {updatePostMutation.isPending ? 'Saving...' : 'Save'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCancelEditImportPrice}
-                              className="h-8 px-3"
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-sm font-semibold text-green-600">
-                              {post.import_price ? (
-                                new Intl.NumberFormat('vi-VN', {
-                                  style: 'currency',
-                                  currency: 'VND'
-                                }).format(post.import_price)
-                              ) : (
-                                <span className="text-muted-foreground">Chưa có giá nhập</span>
-                              )}
-                            </p>
-                            <Button
-                              size="sm"
-                              onClick={handleEditImportPrice}
-                              className="h-6 px-2"
-                            >
-                              <Edit2 className="h-3 w-3 mr-1" />
-                              Sửa
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-
                     {/* Post Description */}
                     {post.description && (
                       <div>
@@ -577,24 +488,21 @@ export const OrdersDrawer: React.FC = () => {
               </div>
 
               <div className="flex flex-col lg:items-end space-y-3 lg:space-y-2 lg:ml-4">
-                {/* Statistics by Type */}
+                {/* Button to open Đơn hàng chưa đặt dialog */}
                 {Object.keys(newOrdersByType).length > 0 && (
-                  <div className="lg:text-right">
-                    <div className="text-sm text-muted-foreground mb-1">Đơn hàng chưa đặt:</div>
-                    <div className="space-y-1">
-                      {Object.entries(newOrdersByType)
-                        .sort(([, a], [, b]) => b - a) // Sort by quantity descending
-                        .map(([type, quantity]) => (
-                          <div key={type} className="text-sm">
-                            {type}: {quantity}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full lg:w-auto"
+                    onClick={() => setIsNewOrdersDialogOpen(true)}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Đơn hàng chưa đặt ({totalNewQuantity})
+                  </Button>
                 )}
 
                 {/* Revenue Display */}
-                {isAdmin && post?.import_price && (
+                {isAdmin && (
                   <div className="lg:text-right">
                     <div className="text-sm text-muted-foreground">Total Revenue</div>
                     <div className="text-xl lg:text-2xl font-bold text-green-600">
@@ -995,6 +903,57 @@ export const OrdersDrawer: React.FC = () => {
         </DrawerContent>
       </Drawer>
 
+      {/* Đơn hàng chưa đặt - Dialog */}
+      <Dialog open={isNewOrdersDialogOpen} onOpenChange={setIsNewOrdersDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Đơn hàng chưa đặt</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto space-y-4 -mx-1 px-1">
+            {/* Tổng hợp theo loại */}
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Tổng hợp theo loại:</h4>
+              <div className="space-y-1">
+                {Object.entries(newOrdersByType)
+                  .sort(([, a]: [string, number], [, b]: [string, number]) => b - a)
+                  .map(([type, quantity]) => (
+                    <div key={type} className="text-sm flex justify-between">
+                      <span>{type}</span>
+                      <span className="font-medium">{quantity}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            {/* Danh sách đơn hàng chưa đặt */}
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Danh sách đơn ({newOrders.length} đơn):</h4>
+              <div className="border rounded-md max-h-64 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">#</TableHead>
+                      <TableHead>Khách hàng</TableHead>
+                      <TableHead className="text-right">SL</TableHead>
+                      <TableHead>Loại</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {newOrders.map((order: Order, index: number) => (
+                      <TableRow key={order.order_id || getOrderCommentId(order)}>
+                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                        <TableCell className="truncate max-w-40">{getOrderCustomerName(order)}</TableCell>
+                        <TableCell className="text-right">{getOrderQuantity(order)}</TableCell>
+                        <TableCell>{getOrderType(order) || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Batch Update Confirmation Dialog with Preview */}
       <AlertDialog open={showBatchUpdateDialog} onOpenChange={setShowBatchUpdateDialog}>
         <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -1087,6 +1046,9 @@ export const OrdersDrawer: React.FC = () => {
         items={post?.items || []}
         onSave={handleSaveItems}
         loading={updatePostMutation.isPending}
+        isAdmin={isAdmin}
+        groupId={selectedGroupId || ''}
+        postId={selectedPostId || ''}
       />
 
       <SplitOrderModal

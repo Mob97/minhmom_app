@@ -207,6 +207,66 @@ async def upload_order_note_images(
     return {"urls": urls}
 
 
+@router.post("/groups/{group_id}/posts/{post_id}/items/{item_index}/stock-images")
+async def upload_item_stock_images(
+    group_id: str = Path(..., description="Group ID"),
+    post_id: str = Path(..., description="Post ID"),
+    item_index: int = Path(..., ge=0, description="Item index in post.items"),
+    files: list[UploadFile] = File(..., description="Image files"),
+    current_user: dict = Depends(require_user_or_admin()),
+    db=Depends(get_db)
+):
+    """
+    Upload one or more images for an item's stock batch. Saves under base_path/stock/group_id/post_id/item_{item_index}/.
+    Returns list of URL paths for the frontend to store in stock_history[].images.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    post = await posts_col(db, group_id).find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail=f"Post {post_id} not found in group {group_id}")
+
+    items = post.get("items") or []
+    if item_index >= len(items):
+        raise HTTPException(status_code=404, detail=f"Item index {item_index} not found in post (has {len(items)} items)")
+
+    base_path = _images_base_path()
+    stock_dir = getattr(config.images, "stock_dir", "stock")
+    rel_dir = os.path.join(stock_dir, group_id, post_id, f"item_{item_index}")
+    save_dir = os.path.join(base_path, rel_dir)
+    os.makedirs(save_dir, exist_ok=True)
+
+    max_bytes = config.images.max_file_size_mb * 1024 * 1024
+    allowed = [e.lower() for e in config.images.allowed_extensions]
+    urls = []
+
+    for upload in files:
+        if not upload.filename:
+            continue
+        ext = os.path.splitext(upload.filename)[1].lower()
+        if ext not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type: {upload.filename}. Allowed: {allowed}"
+            )
+        content = await upload.read()
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File {upload.filename} exceeds {config.images.max_file_size_mb}MB"
+            )
+        safe_name = f"{uuid.uuid4().hex}{ext}"
+        file_path = os.path.join(save_dir, safe_name)
+        with open(file_path, "wb") as f:
+            f.write(content)
+        rel_path = os.path.join(rel_dir, safe_name).replace("\\", "/")
+        url_path = f"/static/images/{rel_path}"
+        urls.append(url_path)
+
+    return {"urls": urls}
+
+
 @router.get("/health")
 async def images_health():
     """
