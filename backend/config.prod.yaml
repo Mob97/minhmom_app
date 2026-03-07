@@ -1,7 +1,7 @@
 # Production Backend Configuration
 database:
-  mongodb_uri: mongodb://root:change-me@192.168.100.232:27017/
-  db_name: "minhmom"
+  mongodb_uri: mongodb://root:change-me@192.168.1.14:27017/
+  db_name: "minhmom_dev"
   default_group_id: null
 
 # Image serving configuration
@@ -9,6 +9,7 @@ images:
   base_path: "/app/images"
   posts_dir: "posts"
   comments_dir: "comments"
+  orders_dir: "orders"
   allowed_extensions: [".jpg", ".jpeg", ".png", ".gif", ".webp"]
   max_file_size_mb: 10
 

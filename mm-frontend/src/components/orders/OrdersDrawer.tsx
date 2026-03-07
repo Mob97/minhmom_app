@@ -6,6 +6,8 @@ import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { RefreshCw, Plus, ExternalLink, Edit2, Trash2, Split } from 'lucide-react';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
@@ -25,7 +27,8 @@ import {
   getOrderType,
   getOrderTotalPrice,
   getOrderPriceCalc,
-  getOrderCommentId
+  getOrderCommentId,
+  getOrderCommentCreatedTime
 } from '@/types/api';
 
 export const OrdersDrawer: React.FC = () => {
@@ -58,7 +61,18 @@ export const OrdersDrawer: React.FC = () => {
   const splitOrderMutation = useSplitOrder();
   const updatePostMutation = useUpdatePost();
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+
+  // Helper function to get status display name
+  const getStatusDisplayName = (statusCode: string) => {
+    const status = statuses?.find((s: any) => s.status_code === statusCode);
+    return status?.display_name || statusCode;
+  };
+
+  // Helper function to find status code by display name
+  const findStatusCodeByDisplayName = (displayName: string): string | undefined => {
+    return statuses?.find((s: any) => s.display_name === displayName)?.status_code;
+  };
 
   const [isEditingImportPrice, setIsEditingImportPrice] = useState(false);
   const [importPriceValue, setImportPriceValue] = useState('');
@@ -69,10 +83,25 @@ export const OrdersDrawer: React.FC = () => {
   const [isItemManagementModalOpen, setIsItemManagementModalOpen] = useState(false);
   const [isSplitOrderModalOpen, setIsSplitOrderModalOpen] = useState(false);
   const [orderToSplit, setOrderToSplit] = useState<Order | null>(null);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [showBatchUpdateDialog, setShowBatchUpdateDialog] = useState(false);
+  const [ordersToUpdate, setOrdersToUpdate] = useState<Order[]>([]);
+  const [newStatusCode, setNewStatusCode] = useState<string>('');
 
-  const filteredOrders = orders?.filter(order =>
+  const filteredOrders = (orders?.filter((order: Order) =>
     !ordersStatusFilter || ordersStatusFilter === "all" || order.status_code === ordersStatusFilter
-  ) || [];
+  ) || []).sort((a: Order, b: Order) => {
+    const timeA = getOrderCommentCreatedTime(a);
+    const timeB = getOrderCommentCreatedTime(b);
+
+    // Handle cases where comment_created_time might be undefined
+    if (!timeA && !timeB) return 0;
+    if (!timeA) return 1; // Put orders without time at the end
+    if (!timeB) return -1; // Put orders without time at the end
+
+    // Sort in ascending order (oldest first)
+    return new Date(timeA).getTime() - new Date(timeB).getTime();
+  });
 
 
   // Calculate total revenue (order total - import price * total quantity)
@@ -94,14 +123,15 @@ export const OrdersDrawer: React.FC = () => {
 
   const totalRevenue = calculateTotalRevenue();
 
-  // Calculate NEW orders count by type
+  // Calculate NEW orders quantity by type
   const calculateNewOrdersByType = () => {
     if (!filteredOrders) return {};
 
     return filteredOrders.reduce((acc, order) => {
       if (order.status_code === 'NEW') {
-        const type = getOrderType(order) || 'Unknown';
-        acc[type] = (acc[type] || 0) + 1;
+        const type = getOrderType(order) || 'Mặt hàng khác';
+        const quantity = getOrderQuantity(order);
+        acc[type] = (acc[type] || 0) + quantity;
       }
       return acc;
     }, {} as Record<string, number>);
@@ -296,6 +326,104 @@ export const OrdersDrawer: React.FC = () => {
     setIsSplitOrderModalOpen(true);
   };
 
+  const handleOrderSelect = (orderId: string, checked: boolean) => {
+    setSelectedOrders(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(orderId);
+      } else {
+        newSet.delete(orderId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedOrders(new Set(filteredOrders.map(order => order.order_id || getOrderCommentId(order) || '')));
+    } else {
+      setSelectedOrders(new Set());
+    }
+  };
+
+  const handleBatchStatusUpdate = (statusDisplayName: string) => {
+    if (selectedOrders.size === 0) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng chọn ít nhất một đơn hàng để cập nhật",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const statusCode = findStatusCodeByDisplayName(statusDisplayName);
+    if (!statusCode) {
+      toast({
+        title: "Lỗi",
+        description: `Không tìm thấy trạng thái: ${statusDisplayName}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedOrdersData = filteredOrders.filter(order =>
+      selectedOrders.has(order.order_id || getOrderCommentId(order) || '')
+    );
+
+    setOrdersToUpdate(selectedOrdersData);
+    setNewStatusCode(statusCode);
+    setShowBatchUpdateDialog(true);
+  };
+
+  const handleBatchUpdateConfirm = async () => {
+    if (!selectedGroupId || !selectedPostId || ordersToUpdate.length === 0) return;
+
+    try {
+      const updatePromises = ordersToUpdate.map(order =>
+        updateOrderStatusMutation.mutateAsync({
+          groupId: selectedGroupId,
+          postId: selectedPostId,
+          orderId: order.order_id || getOrderCommentId(order) || '',
+          data: {
+            new_status_code: newStatusCode,
+            note: `Trạng thái được cập nhật thành ${getStatusDisplayName(newStatusCode)}`,
+            actor: user?.username || 'System'
+          }
+        })
+      );
+
+      await Promise.all(updatePromises);
+
+      // Clear selections
+      setSelectedOrders(new Set());
+      setShowBatchUpdateDialog(false);
+      setOrdersToUpdate([]);
+      setNewStatusCode('');
+
+      // Show success message
+      toast({
+        title: "Thành công",
+        description: `Đã cập nhật ${ordersToUpdate.length} đơn hàng thành trạng thái ${getStatusDisplayName(newStatusCode)}`,
+      });
+
+      // Refetch data to update the UI
+      refetch();
+    } catch (error: any) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: "Lỗi",
+        description: error.detail || "Có lỗi xảy ra khi cập nhật trạng thái đơn hàng",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBatchUpdateCancel = () => {
+    setShowBatchUpdateDialog(false);
+    setOrdersToUpdate([]);
+    setNewStatusCode('');
+  };
+
   const handleSplitOrderSubmit = async (splitQuantity: number, newStatus: string) => {
     if (!selectedGroupId || !selectedPostId || !orderToSplit) return;
 
@@ -455,10 +583,10 @@ export const OrdersDrawer: React.FC = () => {
                     <div className="text-sm text-muted-foreground mb-1">Đơn hàng chưa đặt:</div>
                     <div className="space-y-1">
                       {Object.entries(newOrdersByType)
-                        .sort(([, a], [, b]) => b - a) // Sort by count descending
-                        .map(([type, count]) => (
+                        .sort(([, a], [, b]) => b - a) // Sort by quantity descending
+                        .map(([type, quantity]) => (
                           <div key={type} className="text-sm">
-                            {type}: {count}
+                            {type}: {quantity}
                           </div>
                         ))}
                     </div>
@@ -524,6 +652,48 @@ export const OrdersDrawer: React.FC = () => {
               </div>
             </div>
 
+            {/* Batch Update Buttons */}
+            {selectedOrders.size > 0 && (
+              <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="select-all-orders"
+                    checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
+                  <label htmlFor="select-all-orders" className="text-sm font-medium">
+                    Chọn tất cả ({selectedOrders.size} đã chọn)
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBatchStatusUpdate('Hàng đã về')}
+                    disabled={selectedOrders.size === 0}
+                  >
+                    Hàng đã về ({selectedOrders.size})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBatchStatusUpdate('Dồn đơn')}
+                    disabled={selectedOrders.size === 0}
+                  >
+                    Dồn đơn ({selectedOrders.size})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBatchStatusUpdate('Đang vận chuyển')}
+                    disabled={selectedOrders.size === 0}
+                  >
+                    Đang vận chuyển ({selectedOrders.size})
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Orders Table */}
             {isLoading ? (
               <div className="flex items-center justify-center h-32">
@@ -553,6 +723,12 @@ export const OrdersDrawer: React.FC = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
                         <TableHead>{t.common.user}</TableHead>
                         <TableHead>{t.common.quantity}</TableHead>
                         <TableHead>{t.common.type}</TableHead>
@@ -563,8 +739,17 @@ export const OrdersDrawer: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredOrders.map((order) => (
-                        <TableRow key={order.order_id || getOrderCommentId(order)}>
+                      {filteredOrders.map((order) => {
+                        const orderId = order.order_id || getOrderCommentId(order) || '';
+                        const isSelected = selectedOrders.has(orderId);
+                        return (
+                        <TableRow key={orderId}>
+                          <TableCell>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => handleOrderSelect(orderId, checked as boolean)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <Button
@@ -614,8 +799,20 @@ export const OrdersDrawer: React.FC = () => {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <div className="max-w-32 truncate" title={order.note || ''}>
-                              {order.note || '—'}
+                            <div className="max-w-32">
+                              <div className="truncate" title={order.note || ''}>
+                                {order.note || '—'}
+                              </div>
+                              {order.note_images && order.note_images.length > 0 && (
+                                <div className="mt-1">
+                                  <ImageGallery
+                                    images={order.note_images}
+                                    title="Ảnh ghi chú"
+                                    postId={order.order_id}
+                                    maxDisplay={3}
+                                  />
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -649,18 +846,26 @@ export const OrdersDrawer: React.FC = () => {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
 
                 {/* Mobile Card View */}
                 <div className="lg:hidden space-y-4">
-                  {filteredOrders.map((order) => (
-                    <div key={order.order_id || getOrderCommentId(order)} className="border rounded-lg p-4 space-y-3">
+                  {filteredOrders.map((order) => {
+                    const orderId = order.order_id || getOrderCommentId(order) || '';
+                    const isSelected = selectedOrders.has(orderId);
+                    return (
+                    <div key={orderId} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-2">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => handleOrderSelect(orderId, checked as boolean)}
+                            />
                             <Button
                               variant="link"
                               size="sm"
@@ -706,6 +911,19 @@ export const OrdersDrawer: React.FC = () => {
                               <div>
                                 <span className="text-muted-foreground">Ghi chú:</span>
                                 <p className="text-sm mt-1 line-clamp-2">{order.note}</p>
+                              </div>
+                            )}
+                            {order.note_images && order.note_images.length > 0 && (
+                              <div>
+                                <span className="text-muted-foreground text-xs">Ảnh:</span>
+                                <div className="mt-1">
+                                  <ImageGallery
+                                    images={order.note_images}
+                                    title="Ảnh ghi chú"
+                                    postId={order.order_id}
+                                    maxDisplay={3}
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>
@@ -768,13 +986,77 @@ export const OrdersDrawer: React.FC = () => {
                         </Select>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
           </div>
         </DrawerContent>
       </Drawer>
+
+      {/* Batch Update Confirmation Dialog with Preview */}
+      <AlertDialog open={showBatchUpdateDialog} onOpenChange={setShowBatchUpdateDialog}>
+        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cập nhật trạng thái đơn hàng</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có muốn cập nhật {ordersToUpdate.length} đơn hàng đã chọn thành trạng thái "{getStatusDisplayName(newStatusCode)}" không?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="my-4">
+            <h4 className="text-sm font-semibold mb-2">Danh sách đơn hàng sẽ được cập nhật:</h4>
+            <div className="border rounded-md max-h-64 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">STT</TableHead>
+                    <TableHead>Khách hàng</TableHead>
+                    <TableHead>Số lượng</TableHead>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Tổng cộng</TableHead>
+                    <TableHead>Trạng thái hiện tại</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ordersToUpdate.map((order: Order, index: number) => (
+                    <TableRow key={order.order_id || getOrderCommentId(order)}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>
+                        <div className="truncate max-w-32">
+                          {getOrderCustomerName(order)}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getOrderQuantity(order)}</TableCell>
+                      <TableCell>{getOrderType(order)}</TableCell>
+                      <TableCell>
+                        {getOrderPriceCalc(order) ?
+                          t.currency.format(getOrderTotalPrice(order)) :
+                          '—'
+                        }
+                      </TableCell>
+                      <TableCell>{getStatusDisplayName(order.status_code || '')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleBatchUpdateCancel} disabled={updateOrderStatusMutation.isPending}>
+              Hủy
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchUpdateConfirm}
+              disabled={updateOrderStatusMutation.isPending}
+            >
+              {updateOrderStatusMutation.isPending ? 'Đang cập nhật...' : 'Xác nhận'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CreateOrderModal
         open={isCreateOrderModalOpen}

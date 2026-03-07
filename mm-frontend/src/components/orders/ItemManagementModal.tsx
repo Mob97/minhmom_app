@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,13 +34,20 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
 }) => {
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
   const [editingItem, setEditingItem] = useState<EditableItem | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const prevOpenRef = useRef(false);
   const { toast } = useToast();
 
-  // Initialize editable items when modal opens
+  // Initialize editable items only when modal opens (not when items ref changes, to avoid wiping in-progress edits)
   useEffect(() => {
     if (open) {
-      setEditableItems([...items]);
+      if (!prevOpenRef.current) {
+        setEditableItems([...items]);
+      }
+      prevOpenRef.current = true;
+    } else {
+      prevOpenRef.current = false;
     }
   }, [open, items]);
 
@@ -51,45 +58,54 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
       prices: [{
         qty: 1,
         bundle_price: 0
-      }]
+      }],
+      stock_quantity: undefined
     };
+    const newIndex = editableItems.length;
     setEditableItems([...editableItems, newItem]);
+    setEditingIndex(newIndex);
     setEditingItem(newItem);
     setIsEditing(true);
   };
 
   const handleEditItem = (item: EditableItem) => {
+    const idx = editableItems.findIndex((i) => i === item);
+    setEditingIndex(idx >= 0 ? idx : null);
     setEditingItem(item);
     setIsEditing(true);
   };
 
   const handleDeleteItem = (itemIndex: number) => {
     setEditableItems(editableItems.filter((_, index) => index !== itemIndex));
-    if (editingItem === editableItems[itemIndex]) {
+    if (editingIndex === itemIndex) {
       setEditingItem(null);
+      setEditingIndex(null);
       setIsEditing(false);
+    } else if (editingIndex !== null && editingIndex > itemIndex) {
+      setEditingIndex(editingIndex - 1);
     }
   };
 
   const handleSaveItem = () => {
-    if (!editingItem) return;
+    if (!editingItem || editingIndex === null) return;
 
-    const editingIndex = editableItems.findIndex(item => item === editingItem);
-    if (editingIndex !== -1) {
-      const updatedItems = [...editableItems];
+    const updatedItems = [...editableItems];
+    if (editingIndex >= 0 && editingIndex < updatedItems.length) {
       updatedItems[editingIndex] = editingItem;
       setEditableItems(updatedItems);
     }
     setEditingItem(null);
+    setEditingIndex(null);
     setIsEditing(false);
   };
 
   const handleCancelEdit = () => {
     setEditingItem(null);
+    setEditingIndex(null);
     setIsEditing(false);
   };
 
-  const handleUpdateItemField = (field: keyof EditableItem, value: string) => {
+  const handleUpdateItemField = (field: keyof EditableItem, value: string | number | undefined) => {
     if (!editingItem) return;
     setEditingItem({ ...editingItem, [field]: value });
   };
@@ -152,7 +168,8 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
     const itemsToSave: PostItem[] = editableItems.map(item => ({
       name: item.name,
       type: item.type,
-      prices: item.prices
+      prices: item.prices,
+      stock_quantity: item.stock_quantity
     }));
 
     onSave(itemsToSave);
@@ -189,6 +206,11 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                         <span className="text-sm text-muted-foreground">
                           {item.prices.length} price pack{item.prices.length !== 1 ? 's' : ''}
                         </span>
+                        {item.stock_quantity != null && (
+                          <span className="text-sm text-muted-foreground">
+                            · Tồn: {item.stock_quantity}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -271,6 +293,21 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                       value={editingItem.type || ''}
                       onChange={(e) => handleUpdateItemField('type', e.target.value)}
                       placeholder="Nhập loại sản phẩm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="item-stock">Số lượng tồn kho</Label>
+                    <Input
+                      id="item-stock"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={editingItem.stock_quantity ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        handleUpdateItemField('stock_quantity', v === '' ? undefined : Math.max(0, parseInt(v, 10) || 0));
+                      }}
+                      placeholder="Để trống = không giới hạn"
                     />
                   </div>
                 </div>

@@ -15,6 +15,7 @@ class ImageConfig(BaseModel):
     base_path: str = "../minhmom_fb/downloaded_files/images"
     posts_dir: str = "posts"
     comments_dir: str = "comments"
+    orders_dir: str = "orders"
     allowed_extensions: List[str] = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
     max_file_size_mb: int = 10
 
@@ -61,6 +62,7 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
                 "base_path": os.getenv("IMAGES_BASE_PATH", "/app/images"),
                 "posts_dir": "posts",
                 "comments_dir": "comments",
+                "orders_dir": "orders",
                 "allowed_extensions": [".jpg", ".jpeg", ".png", ".gif", ".webp"],
                 "max_file_size_mb": 10
             },

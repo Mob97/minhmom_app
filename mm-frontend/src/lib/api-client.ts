@@ -329,6 +329,28 @@ export const imageApi = {
     return `${apiBaseUrl}/images/posts/${postId}/${filename}`;
   },
 
+  uploadOrderNoteImages: async (
+    groupId: string,
+    postId: string,
+    orderId: string,
+    files: File[]
+  ): Promise<{ urls: string[] }> => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    const response: AxiosResponse<{ urls: string[] }> = await apiClient.post(
+      `/images/groups/${groupId}/posts/${postId}/orders/${orderId}/note-images`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  getOrderNoteImageUrl: (path: string): string => {
+    if (path.startsWith('http')) return path;
+    const { apiBaseUrl } = getConfig();
+    return `${apiBaseUrl}${path}`;
+  },
+
   health: async (): Promise<{ images_path: string; exists: boolean; posts_dir: string; posts_dir_exists: boolean }> => {
     const response: AxiosResponse<{ images_path: string; exists: boolean; posts_dir: string; posts_dir_exists: boolean }> =
       await apiClient.get('/images/health');

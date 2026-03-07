@@ -1,11 +1,21 @@
-from fastapi import APIRouter, HTTPException, Path, Depends
+import os
+import uuid
+from fastapi import APIRouter, HTTPException, Path, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 from ..config import config
 from ..db import get_db, posts_col
 from ..auth import require_user_or_admin
-import os
 
 router = APIRouter(prefix="/images", tags=["Images"])
+
+
+def _images_base_path() -> str:
+    """Resolve images base path to match main.py static mount."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    app_dir = os.path.dirname(current_dir)
+    backend_dir = os.path.dirname(app_dir)
+    base = config.images.base_path
+    return os.path.join(backend_dir, base) if not os.path.isabs(base) else base
 
 @router.get("/test")
 async def test_endpoint():
@@ -133,6 +143,68 @@ async def serve_image(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error serving image: {str(e)}")
+
+
+@router.post("/groups/{group_id}/posts/{post_id}/orders/{order_id}/note-images")
+async def upload_order_note_images(
+    group_id: str = Path(..., description="Group ID"),
+    post_id: str = Path(..., description="Post ID"),
+    order_id: str = Path(..., description="Order ID"),
+    files: list[UploadFile] = File(..., description="Image files"),
+    current_user: dict = Depends(require_user_or_admin()),
+    db=Depends(get_db)
+):
+    """
+    Upload one or more images for an order's note. Saves under base_path/orders/group_id/post_id/order_id/.
+    Returns list of URL paths for the frontend to store in order.note_images.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    post = await posts_col(db, group_id).find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail=f"Post {post_id} not found in group {group_id}")
+
+    order_exists = any(
+        o.get("order_id") == order_id for o in post.get("orders") or []
+    )
+    if not order_exists:
+        raise HTTPException(status_code=404, detail=f"Order {order_id} not found in post")
+
+    base_path = _images_base_path()
+    orders_dir = config.images.orders_dir
+    rel_dir = os.path.join(orders_dir, group_id, post_id, order_id)
+    save_dir = os.path.join(base_path, rel_dir)
+    os.makedirs(save_dir, exist_ok=True)
+
+    max_bytes = config.images.max_file_size_mb * 1024 * 1024
+    allowed = [e.lower() for e in config.images.allowed_extensions]
+    urls = []
+
+    for upload in files:
+        if not upload.filename:
+            continue
+        ext = os.path.splitext(upload.filename)[1].lower()
+        if ext not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type: {upload.filename}. Allowed: {allowed}"
+            )
+        content = await upload.read()
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File {upload.filename} exceeds {config.images.max_file_size_mb}MB"
+            )
+        safe_name = f"{uuid.uuid4().hex}{ext}"
+        file_path = os.path.join(save_dir, safe_name)
+        with open(file_path, "wb") as f:
+            f.write(content)
+        rel_path = os.path.join(rel_dir, safe_name).replace("\\", "/")
+        url_path = f"/static/images/{rel_path}"
+        urls.append(url_path)
+
+    return {"urls": urls}
 
 
 @router.get("/health")

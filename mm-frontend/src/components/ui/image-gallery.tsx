@@ -7,6 +7,7 @@ import { getConfig } from '@/lib/api-client';
 interface ImageGalleryProps {
   images: string[];
   postId: string;
+  title?: string;
   maxDisplay?: number;
   className?: string;
 }
@@ -14,6 +15,7 @@ interface ImageGalleryProps {
 export const ImageGallery: React.FC<ImageGalleryProps> = ({
   images,
   postId,
+  title,
   maxDisplay = 3,
   className = ''
 }) => {
@@ -73,7 +75,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg flex items-center justify-center transition-all">
+            <div className="absolute inset-0 pointer-events-none bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg flex items-center justify-center transition-all">
               <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
@@ -96,7 +98,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         <DialogContent className="max-w-4xl max-h-[90vh] p-0">
           <DialogHeader className="p-6 pb-0">
             <DialogTitle className="flex items-center justify-between">
-              <span>Post Images ({images.length})</span>
+              <span>{title ?? `Post Images (${images.length})`}</span>
               <Button
                 variant="ghost"
                 size="sm"

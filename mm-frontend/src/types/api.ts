@@ -162,6 +162,7 @@ export interface PostItem {
   name?: string;
   type?: string;
   prices: PricePack[];
+  stock_quantity?: number;
 }
 
 export interface PricePack {
@@ -231,6 +232,7 @@ export interface Order {
   status_code: string;
   status_history: OrderStatusHistory[];
   note?: string;
+  note_images?: string[];
   post_id?: string;
   post_description?: string;
 
@@ -298,6 +300,7 @@ export interface UpdateOrderRequest {
   item?: OrderItem;
   status_code?: string;
   note?: string;
+  note_images?: string[];
 
   // Price fields
   unit_price?: number;

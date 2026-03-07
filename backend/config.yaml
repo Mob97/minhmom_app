@@ -9,6 +9,7 @@ images:
   base_path: "D:/01_Projects/09_minhmom/post_images"
   posts_dir: "posts"
   comments_dir: "comments"
+  orders_dir: "orders"
   allowed_extensions: [".jpg", ".jpeg", ".png", ".gif", ".webp"]
   max_file_size_mb: 10
 

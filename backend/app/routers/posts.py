@@ -718,6 +718,8 @@ async def update_order(
         }
     if body.note is not None:
         update_data["orders.$[o].note"] = body.note
+    if body.note_images is not None:
+        update_data["orders.$[o].note_images"] = body.note_images
     if body.user is not None:
         update_data["orders.$[o].user"] = body.user.model_dump()
 

@@ -34,6 +34,7 @@ class Item(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
     prices: List[PricePack] = Field(default_factory=list)
+    stock_quantity: Optional[int] = Field(default=None, ge=0)
 
 
 # =========================
@@ -236,6 +237,7 @@ class OrderIn(BaseModel):
 
     status_code: str = "NEW"
     note: Optional[str] = None
+    note_images: Optional[List[str]] = None
     user: Optional[OrderUserOut] = None
 
 
@@ -269,6 +271,7 @@ class OrderUpdate(BaseModel):
 
     status_code: Optional[str] = None
     note: Optional[str] = None
+    note_images: Optional[List[str]] = None
     user: Optional[OrderUserOut] = None
 
 
@@ -287,6 +290,7 @@ class OrderOut(BaseModel):
     status_code: str
     status_history: List[OrderStatusHistory] = Field(default_factory=list)
     note: Optional[str] = None
+    note_images: Optional[List[str]] = None
 
     # Legacy fields for backward compatibility
     comment_id: Optional[str] = None

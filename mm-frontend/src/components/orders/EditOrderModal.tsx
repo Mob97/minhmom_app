@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAppStore } from '@/store/app-store';
 import { useStatuses, usePost } from '@/hooks/use-api';
 import { t } from '@/lib/i18n';
+import { imageApi } from '@/lib/api-client';
+import { useToast } from '@/hooks/use-toast';
+import { ImagePlus, X } from 'lucide-react';
 import type { Order, UpdateOrderRequest } from '@/types/api';
 import {
   getOrderCustomerName,
@@ -37,6 +40,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const { selectedPostId, selectedGroupId } = useAppStore();
   const { data: statuses } = useStatuses({ active: true });
   const { data: postData } = usePost(selectedGroupId || '', selectedPostId || '');
+  const { toast } = useToast();
+  const noteImagesInputRef = useRef<HTMLInputElement>(null);
 
   // Money formatting functions
   const formatMoney = (value: string | number): string => {
@@ -66,6 +71,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     total_price: '',
     selected_item_id: '',
   });
+  const [noteImages, setNoteImages] = useState<string[]>([]);
+  const [noteImagesUploading, setNoteImagesUploading] = useState(false);
   const [isTypingTotalPrice, setIsTypingTotalPrice] = useState(false);
 
   // Update form data when order changes
@@ -85,6 +92,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
         total_price: formatMoney(getOrderTotalPrice(order) || 0),
         selected_item_id: order?.item?.item_id?.toString() || '',
       });
+      setNoteImages(order.note_images || []);
     }
   }, [order]);
 
@@ -148,6 +156,31 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
     }));
   };
 
+  const handleNoteImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !selectedGroupId || !selectedPostId || !order) return;
+    setNoteImagesUploading(true);
+    try {
+      const { urls } = await imageApi.uploadOrderNoteImages(
+        selectedGroupId,
+        selectedPostId,
+        order.order_id,
+        Array.from(files)
+      );
+      setNoteImages((prev) => [...prev, ...urls]);
+    } catch (err: unknown) {
+      const detail = typeof (err as { detail?: unknown }).detail === 'string' ? (err as { detail: string }).detail : 'Không thể tải ảnh lên';
+      toast({ title: 'Lỗi', description: detail, variant: 'destructive' });
+    } finally {
+      setNoteImagesUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeNoteImage = (index: number) => {
+    setNoteImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const submitData: UpdateOrderRequest = {
@@ -157,6 +190,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
       currency: formData.currency || undefined,
       status_code: formData.status_code || undefined,
       note: formData.note || undefined,
+      note_images: noteImages,
       user: {
         name: formData.user_name || undefined,
         address: formData.user_address || undefined,
@@ -196,6 +230,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
           total_price: formatMoney(getOrderTotalPrice(order) || 0),
           selected_item_id: order?.item?.item_id?.toString() || '',
         });
+        setNoteImages(order.note_images || []);
       }
     }
     onOpenChange(open);
@@ -374,6 +409,49 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 placeholder="Ghi chú cho đơn hàng..."
                 rows={2}
               />
+            </div>
+            <div className="grid gap-2">
+              <Label>Ảnh ghi chú</Label>
+              <input
+                ref={noteImagesInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleNoteImagesUpload}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={noteImagesUploading}
+                onClick={() => noteImagesInputRef.current?.click()}
+              >
+                <ImagePlus className="h-4 w-4 mr-1" />
+                {noteImagesUploading ? 'Đang tải...' : 'Thêm ảnh'}
+              </Button>
+              {noteImages.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {noteImages.map((path, index) => (
+                    <div key={path} className="relative group">
+                      <img
+                        src={imageApi.getOrderNoteImageUrl(path)}
+                        alt=""
+                        className="h-16 w-16 object-cover rounded border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full opacity-90 group-hover:opacity-100"
+                        onClick={() => removeNoteImage(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
