@@ -78,7 +78,7 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
         qty: 1,
         bundle_price: 0
       }],
-      stock_quantity: undefined,
+      stock_history: [],
       import_price: undefined
     };
     const newIndex = editableItems.length;
@@ -184,16 +184,82 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
       return;
     }
 
-    // Convert back to PostItem format
+    // Convert back to PostItem format (omit stock_quantity; backend computes from stock_history)
     const itemsToSave: PostItem[] = editableItems.map(item => ({
       name: item.name,
       type: item.type,
       prices: item.prices,
-      stock_quantity: item.stock_quantity,
+      stock_history: item.stock_history || [],
       import_price: item.import_price
     }));
 
     onSave(itemsToSave);
+  };
+
+  const handleOpenStockForm = (itemIndex: number) => {
+    setStockFormItemIndex(itemIndex);
+    setStockFormQuantity('');
+    setStockFormNote('');
+    setStockFormFiles([]);
+  };
+
+  const handleCancelStockForm = () => {
+    setStockFormItemIndex(null);
+    setStockFormQuantity('');
+    setStockFormNote('');
+    setStockFormFiles([]);
+  };
+
+  const handleStockFormFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files?.length) setStockFormFiles(Array.from(files));
+    e.target.value = '';
+  };
+
+  const handleSubmitStockBatch = async () => {
+    const qty = Math.max(0, parseInt(stockFormQuantity, 10) || 0);
+    if (qty <= 0) {
+      toast({ title: 'Lỗi', description: 'Nhập số lượng > 0', variant: 'destructive' });
+      return;
+    }
+    if (stockFormItemIndex === null || stockFormItemIndex < 0 || stockFormItemIndex >= editableItems.length) return;
+
+    let imageUrls: string[] = [];
+    if (groupId && postId && stockFormFiles.length > 0) {
+      setStockFormUploading(true);
+      try {
+        const res = await imageApi.uploadItemStockImages(groupId, postId, stockFormItemIndex, stockFormFiles);
+        imageUrls = res.urls || [];
+      } catch (err: unknown) {
+        const detail = typeof (err as { detail?: unknown }).detail === 'string' ? (err as { detail: string }).detail : 'Không thể tải ảnh lên';
+        toast({ title: 'Lỗi', description: detail, variant: 'destructive' });
+        setStockFormUploading(false);
+        return;
+      }
+      setStockFormUploading(false);
+    }
+
+    const newEntry: StockHistoryEntry = {
+      quantity: qty,
+      note: stockFormNote.trim() || undefined,
+      images: imageUrls.length > 0 ? imageUrls : undefined
+    };
+
+    const updated = [...editableItems];
+    const item = updated[stockFormItemIndex];
+    const history = [...(item.stock_history || []), newEntry];
+    updated[stockFormItemIndex] = { ...item, stock_history: history };
+
+    setEditableItems(updated);
+    handleCancelStockForm();
+    onSave(updated.map(i => ({
+      name: i.name,
+      type: i.type,
+      prices: i.prices,
+      stock_history: i.stock_history || [],
+      import_price: i.import_price
+    })));
+    toast({ title: 'Đã thêm đợt nhập hàng' });
   };
 
   const formatCurrency = (amount: number) => {
@@ -227,9 +293,9 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                         <span className="text-sm text-muted-foreground">
                           {item.prices.length} price pack{item.prices.length !== 1 ? 's' : ''}
                         </span>
-                        {item.stock_quantity != null && (
+                        {(computedStock(item) > 0 || (item.stock_history?.length ?? 0) > 0) && (
                           <span className="text-sm text-muted-foreground">
-                            · Tồn: {item.stock_quantity}
+                            · Tồn: {computedStock(item)}
                           </span>
                         )}
                         {isAdmin && item.import_price != null && item.import_price > 0 && (
@@ -260,7 +326,7 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="space-y-2">
                     {item.prices.map((price, priceIndex) => (
                       <div key={priceIndex} className="flex items-center space-x-2 text-sm">
@@ -270,6 +336,97 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                       </div>
                     ))}
                   </div>
+
+                  {/* Nhập hàng button + form */}
+                  {!isEditing && (
+                    <div className="pt-2 border-t">
+                      {stockFormItemIndex !== index ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenStockForm(index)}
+                          disabled={!groupId || !postId}
+                        >
+                          <Package className="h-4 w-4 mr-1" />
+                          Nhập hàng
+                        </Button>
+                      ) : (
+                        <div className="space-y-3 p-3 rounded-md bg-muted/50">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Thêm đợt nhập hàng</span>
+                            <Button variant="ghost" size="sm" onClick={handleCancelStockForm}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs">Số lượng</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={stockFormQuantity}
+                                onChange={(e) => setStockFormQuantity(e.target.value)}
+                                placeholder="Số lượng"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Ảnh (tùy chọn)</Label>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleStockFormFileChange}
+                                className="text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Ghi chú</Label>
+                            <Textarea
+                              value={stockFormNote}
+                              onChange={(e) => setStockFormNote(e.target.value)}
+                              placeholder="Ghi chú đợt nhập"
+                              rows={2}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={handleCancelStockForm}>
+                              Hủy
+                            </Button>
+                            <Button size="sm" onClick={handleSubmitStockBatch} disabled={stockFormUploading}>
+                              {stockFormUploading ? 'Đang tải ảnh...' : 'Thêm đợt'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Lịch sử nhập hàng */}
+                  {((item.stock_history?.length) ?? 0) > 0 && (
+                    <div className="pt-2 border-t">
+                      <h4 className="text-xs font-medium text-muted-foreground mb-2">Lịch sử nhập hàng</h4>
+                      <ul className="space-y-2 max-h-48 overflow-y-auto">
+                        {[...(item.stock_history || [])].reverse().map((entry, ei) => (
+                          <li key={ei} className="text-sm flex flex-col gap-1 pl-2 border-l-2 border-muted">
+                            <span className="text-muted-foreground text-xs">
+                              {entry.created_at ? new Date(entry.created_at).toLocaleString('vi-VN') : '—'}
+                            </span>
+                            <span><strong>{entry.quantity}</strong> {entry.note && `· ${entry.note}`}</span>
+                            {entry.images && entry.images.length > 0 && (
+                              <ImageGallery
+                                images={entry.images}
+                                title="Ảnh đợt nhập"
+                                postId={`item-${index}-entry-${ei}`}
+                                maxDisplay={3}
+                              />
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -319,21 +476,6 @@ export const ItemManagementModal: React.FC<ItemManagementModalProps> = ({
                       value={editingItem.type || ''}
                       onChange={(e) => handleUpdateItemField('type', e.target.value)}
                       placeholder="Nhập loại sản phẩm"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="item-stock">Số lượng tồn kho</Label>
-                    <Input
-                      id="item-stock"
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={editingItem.stock_quantity ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        handleUpdateItemField('stock_quantity', v === '' ? undefined : Math.max(0, parseInt(v, 10) || 0));
-                      }}
-                      placeholder="Để trống = không giới hạn"
                     />
                   </div>
                   {isAdmin && (
