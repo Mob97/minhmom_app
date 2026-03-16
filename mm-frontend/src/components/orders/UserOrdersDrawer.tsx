@@ -843,15 +843,17 @@ export const UserOrdersDrawer: React.FC<UserOrdersDrawerProps> = ({ showAllOrder
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteOrder(order)}
-                                className="text-destructive hover:text-destructive"
-                                disabled={deleteOrderMutation.isPending}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteOrder(order)}
+                                  className="text-destructive hover:text-destructive"
+                                  disabled={deleteOrderMutation.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
