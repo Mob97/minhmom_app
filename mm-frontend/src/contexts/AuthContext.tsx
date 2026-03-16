@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { AuthUser, LoginRequest, RegisterRequest } from '../types/api';
+import type { AuthUser, LoginRequest, RegisterRequest, ChangePasswordRequest } from '../types/api';
 import { authApi, setAuthToken, clearAuthToken } from '../lib/api-client';
 
 interface AuthContextType {
@@ -7,6 +7,7 @@ interface AuthContextType {
   token: string | null;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
+  changePassword: (data: ChangePasswordRequest) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   isAdmin: boolean;
@@ -89,6 +90,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const changePassword = async (data: ChangePasswordRequest) => {
+    try {
+      await authApi.changePassword(data);
+    } catch (error) {
+      console.error('Change password failed:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -101,6 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token,
     login,
     register,
+    changePassword,
     logout,
     isLoading,
     isAdmin,

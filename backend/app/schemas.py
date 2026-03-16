@@ -1,6 +1,6 @@
 # app/schemas.py
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from enum import Enum
 
 # =========================
@@ -335,15 +335,42 @@ class UserRole(str, Enum):
     USER = "user"
 
 
+def _validate_bcrypt_password(value: str) -> str:
+    """Ensure password length is compatible with bcrypt byte limits."""
+    if len(value.encode("utf-8")) > 72:
+        raise ValueError("Password must be at most 72 bytes.")
+    return value
+
+
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=6)
     role: UserRole = UserRole.USER
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return _validate_bcrypt_password(value)
+
 
 class UserLogin(BaseModel):
     username: str
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return _validate_bcrypt_password(value)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=6)
+
+    @field_validator("current_password", "new_password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return _validate_bcrypt_password(value)
 
 
 class UserResponse(BaseModel):

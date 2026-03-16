@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { getConfig } from '@/lib/api-client';
 import { t } from '@/lib/i18n';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings, User, LogOut } from 'lucide-react';
+import { Settings, User, LogOut, KeyRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export const TopBar: React.FC = () => {
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const { selectedGroupId } = useAppStore();
   const { environment } = getConfig();
   const { user, logout, isAdmin } = useAuth();
@@ -68,12 +70,17 @@ export const TopBar: React.FC = () => {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsChangePasswordOpen(true)}>
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  <span>{t.auth.changePassword}</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={logout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>{t.auth.logout}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <ChangePasswordDialog open={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen} />
           </div>
         </div>
       </div>

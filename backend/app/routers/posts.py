@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from datetime import datetime, timezone
+from collections import defaultdict
+import copy
 from ..db import get_db, posts_col, statuses_col
 from ..schemas import PostPatch, PostOut, OrderIn, OrderOut, OrderUpdate, OrderStatusPatch, SplitOrderRequest, PaginatedResponse
 from ..auth import require_user_or_admin
@@ -110,6 +112,131 @@ def normalize_items_for_save(items: list) -> list:
             item["stock_history"] = new_history
         result.append(item)
     return result
+
+
+def is_group2(view_order: int | None) -> bool:
+    return view_order is not None and 2 <= view_order <= 200
+
+
+def status_to_group2(status_doc: dict | None) -> bool:
+    if not status_doc:
+        return False
+    return is_group2(status_doc.get("view_order"))
+
+
+def _coerce_item_id(item_id: object) -> int:
+    if isinstance(item_id, str):
+        return int(item_id) if item_id.isdigit() else 0
+    if item_id is None:
+        return 0
+    return int(item_id)
+
+
+def order_effective_item(order: dict) -> tuple[int, float]:
+    item = order.get("item") or {}
+    item_id = _coerce_item_id(item.get("item_id"))
+
+    qty = item.get("qty")
+    if qty is None:
+        qty = order.get("qty") or 0
+    qty = float(qty)
+
+    return item_id, qty
+
+
+def available_stock_for_item(items: list, item_id: int) -> float:
+    if item_id < 0 or item_id >= len(items):
+        return 0.0
+    item = items[item_id] if isinstance(items[item_id], dict) else {}
+    history = item.get("stock_history") or []
+    return float(sum((entry.get("quantity") or 0) for entry in history))
+
+
+def append_stock_history_entry(items: list, item_id: int, quantity_delta: float, note: str) -> None:
+    if item_id < 0 or item_id >= len(items):
+        raise HTTPException(400, f"Không tìm thấy sản phẩm với item_id={item_id}")
+
+    item = items[item_id]
+    if not isinstance(item, dict):
+        raise HTTPException(400, f"Dữ liệu sản phẩm không hợp lệ với item_id={item_id}")
+
+    history = item.get("stock_history")
+    if not isinstance(history, list):
+        history = []
+        item["stock_history"] = history
+
+    history.append({
+        "quantity": quantity_delta,
+        "note": note,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+def _build_stock_deltas(
+    old_in_group2: bool,
+    new_in_group2: bool,
+    old_item_id: int,
+    old_qty: float,
+    new_item_id: int,
+    new_qty: float,
+) -> dict[int, float]:
+    deltas: dict[int, float] = defaultdict(float)
+
+    if old_in_group2 and new_in_group2:
+        deltas[old_item_id] += old_qty
+        deltas[new_item_id] -= new_qty
+    elif not old_in_group2 and new_in_group2:
+        deltas[new_item_id] -= new_qty
+    elif old_in_group2 and not new_in_group2:
+        deltas[old_item_id] += old_qty
+
+    return {item_id: delta for item_id, delta in deltas.items() if abs(delta) > 1e-9}
+
+
+def _apply_stock_deltas(items: list, deltas: dict[int, float], reason: str) -> list:
+    if not deltas:
+        return items
+
+    updated_items = copy.deepcopy(items or [])
+
+    for item_id, delta in deltas.items():
+        if delta < 0:
+            available = available_stock_for_item(updated_items, item_id)
+            required = -delta
+            if available + 1e-9 < required:
+                raise HTTPException(
+                    400,
+                    f"Không đủ tồn kho cho sản phẩm #{item_id}: cần {required:g}, còn {available:g}"
+                )
+
+    for item_id, delta in deltas.items():
+        note = f"{reason}: {'+' if delta > 0 else ''}{delta:g}"
+        append_stock_history_entry(updated_items, item_id, delta, note)
+
+    return updated_items
+
+
+def apply_stock_transition_to_items(
+    items: list,
+    old_status_doc: dict | None,
+    new_status_doc: dict | None,
+    old_item_id: int,
+    old_qty: float,
+    new_item_id: int,
+    new_qty: float,
+    reason: str,
+) -> list | None:
+    deltas = _build_stock_deltas(
+        old_in_group2=status_to_group2(old_status_doc),
+        new_in_group2=status_to_group2(new_status_doc),
+        old_item_id=old_item_id,
+        old_qty=old_qty,
+        new_item_id=new_item_id,
+        new_qty=new_qty,
+    )
+    if not deltas:
+        return None
+    return _apply_stock_deltas(items, deltas, reason)
 
 
 def filter_import_price_for_user(post_data: dict, user_role: str) -> dict:
@@ -659,18 +786,51 @@ async def update_order_status(
     db=Depends(get_db)
 ):
     # Validate target status
-    st = await statuses_col(db).find_one({"status_code": body.new_status_code})
-    if not st:
+    new_status_doc = await statuses_col(db).find_one({"status_code": body.new_status_code})
+    if not new_status_doc:
         raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.new_status_code}")
 
+    post = await posts_col(db, group_id).find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(404, "Không tìm thấy bài viết")
+
+    existing_order = None
+    for order in post.get("orders", []):
+        if order.get("order_id") == order_id:
+            existing_order = order
+            break
+    if not existing_order:
+        raise HTTPException(404, "Không tìm thấy đơn hàng")
+
+    old_status_code = existing_order.get("status_code")
+    old_status_doc = None
+    if old_status_code:
+        old_status_doc = await statuses_col(db).find_one({"status_code": old_status_code})
+
+    old_item_id, old_qty = order_effective_item(existing_order)
+    maybe_updated_items = apply_stock_transition_to_items(
+        items=post.get("items") or [],
+        old_status_doc=old_status_doc,
+        new_status_doc=new_status_doc,
+        old_item_id=old_item_id,
+        old_qty=old_qty,
+        new_item_id=old_item_id,
+        new_qty=old_qty,
+        reason=f"Đổi trạng thái đơn {order_id}",
+    )
+
     now = datetime.now(timezone.utc)
+    set_data = {
+        "orders.$[o].status_code": body.new_status_code,
+        "orders_last_update_at": now,
+    }
+    if maybe_updated_items is not None:
+        set_data["items"] = maybe_updated_items
+
     res = await posts_col(db, group_id).update_one(
         {"_id": post_id, "orders.order_id": order_id},
         {
-            "$set": {
-                "orders.$[o].status_code": body.new_status_code,
-                "orders_last_update_at": now
-            },
+            "$set": set_data,
             "$push": {"orders.$[o].status_history": {
                 "status": body.new_status_code,
                 "note": body.note,
@@ -709,9 +869,10 @@ async def update_order(
     db=Depends(get_db)
 ):
     # Validate status_code if provided
+    requested_new_status_doc = None
     if body.status_code:
-        st = await statuses_col(db).find_one({"status_code": body.status_code})
-        if not st:
+        requested_new_status_doc = await statuses_col(db).find_one({"status_code": body.status_code})
+        if not requested_new_status_doc:
             raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.status_code}")
 
     # Ensure the post exists
@@ -730,6 +891,11 @@ async def update_order(
         raise HTTPException(404, "Không tìm thấy đơn hàng")
 
     now = datetime.now(timezone.utc)
+    old_item_id, old_qty = order_effective_item(existing_order)
+    old_status_code = existing_order.get("status_code")
+    old_status_doc = None
+    if old_status_code:
+        old_status_doc = await statuses_col(db).find_one({"status_code": old_status_code})
 
     # Get post items for price recalculation if needed
     items = post.get("items") or []
@@ -843,15 +1009,33 @@ async def update_order(
             update_data["orders.$[o].unit_price"] = price_info.get("total", 0) / new_qty if new_qty > 0 else 0
             update_data["orders.$[o].total_price"] = price_info.get("total", 0)
 
+    final_item_id = _coerce_item_id(update_data.get("orders.$[o].item.item_id", old_item_id))
+    final_qty = float(update_data.get("orders.$[o].item.qty", old_qty))
+    final_status_doc = requested_new_status_doc or old_status_doc
+    maybe_updated_items = apply_stock_transition_to_items(
+        items=items,
+        old_status_doc=old_status_doc,
+        new_status_doc=final_status_doc,
+        old_item_id=old_item_id,
+        old_qty=old_qty,
+        new_item_id=final_item_id,
+        new_qty=final_qty,
+        reason=f"Cập nhật đơn {order_id}",
+    )
+
     # Update the order
     # First, update the order data
+    set_data = {
+        **update_data,
+        "orders_last_update_at": now
+    }
+    if maybe_updated_items is not None:
+        set_data["items"] = maybe_updated_items
+
     res = await posts_col(db, group_id).update_one(
         {"_id": post_id, "orders.order_id": order_id},
         {
-            "$set": {
-                **update_data,
-                "orders_last_update_at": now
-            },
+            "$set": set_data,
             "$setOnInsert": {},
         },
         array_filters=[{"o.order_id": order_id}],
@@ -897,15 +1081,10 @@ async def split_order(
     current_user: dict = Depends(require_user_or_admin()),
     db=Depends(get_db)
 ):
-    """
-    Split an order by creating a new order with split quantity and updating the original order.
-    This is a transactional operation that either succeeds completely or fails completely.
-    """
-    from datetime import datetime, timezone
-
+    """Split an order by creating a new order and updating original quantity."""
     # Validate status_code
-    st = await statuses_col(db).find_one({"status_code": body.new_status_code})
-    if not st:
+    new_status_doc = await statuses_col(db).find_one({"status_code": body.new_status_code})
+    if not new_status_doc:
         raise HTTPException(400, f"Mã trạng thái không hợp lệ: {body.new_status_code}")
 
     # Ensure the post exists
@@ -923,8 +1102,8 @@ async def split_order(
     if not existing_order:
         raise HTTPException(404, "Không tìm thấy đơn hàng")
 
-    # Validate split quantity
-    original_qty = existing_order.get("item", {}).get("qty") or existing_order.get("qty", 0)
+    # Validate split quantity from normalized order data
+    original_item_id, original_qty = order_effective_item(existing_order)
     if body.split_quantity >= original_qty:
         raise HTTPException(400, "Số lượng chia phải nhỏ hơn số lượng gốc")
 
@@ -934,112 +1113,125 @@ async def split_order(
     remaining_qty = original_qty - body.split_quantity
     now = datetime.now(timezone.utc)
 
-    try:
-        # Create the new order
-        new_order_id = f"{order_id}_split_{int(datetime.now().timestamp())}"
+    new_order_id = f"{order_id}_split_{int(datetime.now().timestamp())}"
+    unit_price = (
+        existing_order.get("item", {}).get("unit_price")
+        if existing_order.get("item")
+        else existing_order.get("unit_price", 0)
+    ) or 0
 
-        # Prepare new order data
-        new_order = {
-            "order_id": new_order_id,
-            "parsed_at": now,
-            "currency": existing_order.get("currency", "VND"),
-            "raw_url": existing_order.get("raw_url"),
-            "source": existing_order.get("source"),
-            "customer": existing_order.get("customer"),
-            "delivery_info": existing_order.get("delivery_info"),
-            "item": {
-                **existing_order.get("item", {}),
-                "qty": body.split_quantity,
-                "total_price": existing_order.get("item", {}).get("unit_price", 0) * body.split_quantity
-            } if existing_order.get("item") else {
-                "qty": body.split_quantity,
-                "total_price": existing_order.get("unit_price", 0) * body.split_quantity
-            },
-            "status_code": body.new_status_code,
-            "status_history": [{
-                "status": body.new_status_code,
-                "note": body.note or "Split from original order",
-                "at": now
-            }],
-            "note": body.note,
-            # Legacy fields
-            "comment_id": existing_order.get("comment_id"),
-            "comment_url": existing_order.get("comment_url"),
-            "comment_text": existing_order.get("comment_text"),
-            "comment_created_time": existing_order.get("comment_created_time"),
-            "url": existing_order.get("url"),
+    # Prepare new order data
+    new_order = {
+        "order_id": new_order_id,
+        "parsed_at": now,
+        "currency": existing_order.get("currency", "VND"),
+        "raw_url": existing_order.get("raw_url"),
+        "source": existing_order.get("source"),
+        "customer": existing_order.get("customer"),
+        "delivery_info": existing_order.get("delivery_info"),
+        "item": {
+            **existing_order.get("item", {}),
             "qty": body.split_quantity,
-            "type": existing_order.get("type"),
-            "matched_item": existing_order.get("matched_item"),
-            "price_calc": existing_order.get("price_calc"),
-            "user": existing_order.get("user"),
-            "address": existing_order.get("address")
-        }
+            "total_price": unit_price * body.split_quantity
+        } if existing_order.get("item") else {
+            "qty": body.split_quantity,
+            "total_price": unit_price * body.split_quantity
+        },
+        "status_code": body.new_status_code,
+        "status_history": [{
+            "status": body.new_status_code,
+            "note": body.note or "Split from original order",
+            "at": now
+        }],
+        "note": body.note,
+        # Legacy fields
+        "comment_id": existing_order.get("comment_id"),
+        "comment_url": existing_order.get("comment_url"),
+        "comment_text": existing_order.get("comment_text"),
+        "comment_created_time": existing_order.get("comment_created_time"),
+        "url": existing_order.get("url"),
+        "qty": body.split_quantity,
+        "type": existing_order.get("type"),
+        "matched_item": existing_order.get("matched_item"),
+        "price_calc": existing_order.get("price_calc"),
+        "user": existing_order.get("user"),
+        "address": existing_order.get("address")
+    }
 
-        # First, add the new order
-        result1 = await posts_col(db, group_id).update_one(
-            {"_id": post_id},
-            {
-                "$push": {"orders": new_order},
-                "$set": {"orders_last_update_at": now}
-            }
+    old_status_doc = None
+    old_status_code = existing_order.get("status_code")
+    if old_status_code:
+        old_status_doc = await statuses_col(db).find_one({"status_code": old_status_code})
+
+    # Transition 1: original order keeps status but qty decreases
+    deltas_original = _build_stock_deltas(
+        old_in_group2=status_to_group2(old_status_doc),
+        new_in_group2=status_to_group2(old_status_doc),
+        old_item_id=original_item_id,
+        old_qty=original_qty,
+        new_item_id=original_item_id,
+        new_qty=remaining_qty,
+    )
+    # Transition 2: split order goes from Group1 baseline to target status
+    deltas_new_order = _build_stock_deltas(
+        old_in_group2=False,
+        new_in_group2=status_to_group2(new_status_doc),
+        old_item_id=original_item_id,
+        old_qty=0,
+        new_item_id=original_item_id,
+        new_qty=float(body.split_quantity),
+    )
+
+    combined_deltas: dict[int, float] = defaultdict(float)
+    for item_id, delta in deltas_original.items():
+        combined_deltas[item_id] += delta
+    for item_id, delta in deltas_new_order.items():
+        combined_deltas[item_id] += delta
+    combined_deltas = {item_id: delta for item_id, delta in combined_deltas.items() if abs(delta) > 1e-9}
+
+    maybe_updated_items = None
+    if combined_deltas:
+        maybe_updated_items = _apply_stock_deltas(
+            post.get("items") or [],
+            combined_deltas,
+            reason=f"Chia đơn {order_id}",
         )
 
-        if result1.matched_count == 0:
-            raise HTTPException(404, "Không tìm thấy bài viết trong quá trình chia đơn hàng")
+    set_data = {
+        "orders.$[o].qty": remaining_qty,
+        "orders.$[o].item.qty": remaining_qty,
+        "orders.$[o].item.total_price": unit_price * remaining_qty,
+        "orders.$[o].total_price": unit_price * remaining_qty,
+        "orders_last_update_at": now
+    }
+    if maybe_updated_items is not None:
+        set_data["items"] = maybe_updated_items
 
-        # Then, update the original order with reduced quantity
-        update_data = {
-            "$set": {
-                "orders.$[o].qty": remaining_qty,
-                "orders.$[o].item.qty": remaining_qty,
-                "orders.$[o].item.total_price": existing_order.get("item", {}).get("unit_price", 0) * remaining_qty,
-                "orders.$[o].total_price": existing_order.get("item", {}).get("unit_price", 0) * remaining_qty,
-                "orders_last_update_at": now
-            }
-        }
+    res = await posts_col(db, group_id).update_one(
+        {"_id": post_id, "orders.order_id": order_id},
+        {
+            "$push": {"orders": new_order},
+            "$set": set_data,
+        },
+        array_filters=[{"o.order_id": order_id}]
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Không tìm thấy đơn hàng trong quá trình chia")
 
-        result2 = await posts_col(db, group_id).update_one(
-            {"_id": post_id, "orders.order_id": order_id},
-            update_data,
-            array_filters=[{"o.order_id": order_id}]
-        )
+    # Return both orders
+    updated_post = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
+    orders = []
+    for order in updated_post.get("orders", []):
+        if order.get("order_id") in [order_id, new_order_id]:
+            # Convert datetime objects to strings for API response
+            converted_order = convert_order_datetime_to_string(order)
 
-        if result2.matched_count == 0:
-            # If the second update fails, we need to clean up the first operation
-            # Remove the newly added order
-            await posts_col(db, group_id).update_one(
-                {"_id": post_id},
-                {"$pull": {"orders": {"order_id": new_order_id}}}
-            )
-            raise HTTPException(500, "Không thể cập nhật đơn hàng gốc trong quá trình chia")
+            # Convert legacy comment_created_time to local time string
+            converted_order["comment_created_time"] = to_local_time(converted_order.get("comment_created_time"))
 
-        # Return both orders
-        updated_post = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})
-        orders = []
-        for order in updated_post.get("orders", []):
-            if order.get("order_id") in [order_id, new_order_id]:
-                # Convert datetime objects to strings for API response
-                converted_order = convert_order_datetime_to_string(order)
+            orders.append(OrderOut(**converted_order))
 
-                # Convert legacy comment_created_time to local time string
-                converted_order["comment_created_time"] = to_local_time(converted_order.get("comment_created_time"))
-
-                orders.append(OrderOut(**converted_order))
-
-        return orders
-
-    except Exception as e:
-        # If any operation fails, we attempt to clean up
-        try:
-            # Try to remove the newly added order if it exists
-            await posts_col(db, group_id).update_one(
-                {"_id": post_id},
-                {"$pull": {"orders": {"order_id": new_order_id}}}
-            )
-        except Exception:
-            pass  # Ignore cleanup errors
-        raise HTTPException(500, f"Không thể chia đơn hàng: {str(e)}")
+    return orders
 
 
 @router.get("/orders/by-user/{uid}", response_model=List[OrderOut])

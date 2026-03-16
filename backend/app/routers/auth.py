@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import timedelta, datetime, timezone
 from ..db import get_db
-from ..schemas import UserCreate, UserLogin, UserResponse, Token, UserRole
+from ..schemas import ChangePasswordRequest, UserCreate, UserLogin, UserResponse, Token, UserRole
 from ..auth import (
     get_password_hash,
+    verify_password,
     authenticate_user,
     create_access_token,
     get_current_active_user,
@@ -27,7 +28,13 @@ async def register(user: UserCreate, db: AsyncIOMotorDatabase = Depends(get_db))
         )
 
     # Create new user
-    hashed_password = get_password_hash(user.password)
+    try:
+        hashed_password = get_password_hash(user.password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        ) from exc
     user_doc = {
         "username": user.username,
         "hashed_password": hashed_password,
@@ -103,3 +110,38 @@ async def list_users(
         ))
 
     return users
+
+
+@router.post("/change-password")
+async def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: dict = Depends(get_current_active_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """Change current user's password."""
+    if not verify_password(password_data.current_password, current_user["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+
+    if password_data.current_password == password_data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password",
+        )
+
+    try:
+        hashed_password = get_password_hash(password_data.new_password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        ) from exc
+
+    await db["users"].update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"hashed_password": hashed_password}}
+    )
+
+    return {"message": "Password changed successfully"}

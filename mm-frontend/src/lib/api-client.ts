@@ -21,6 +21,7 @@ import type {
   AuthUser,
   LoginRequest,
   RegisterRequest,
+  ChangePasswordRequest,
   AuthResponse,
   OrderUser
 } from '@/types/api';
@@ -100,6 +101,11 @@ export const authApi = {
 
   getUsers: async (): Promise<AuthUser[]> => {
     const response: AxiosResponse<AuthUser[]> = await apiClient.get('/auth/users');
+    return response.data;
+  },
+
+  changePassword: async (data: ChangePasswordRequest): Promise<{ message: string }> => {
+    const response: AxiosResponse<{ message: string }> = await apiClient.post('/auth/change-password', data);
     return response.data;
   },
 };
