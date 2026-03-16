@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile.arm64  # ARM-specific Dockerfile
     container_name: minhmom-backend
     volumes:
-      - /home/minhbq/minhmom/images:/app/images
+      - /mnt/shared/minhmom_data/images/:/app/images
       - ./backend/config.prod.yaml:/app/config.yaml
     environment:
       - MONGODB_URI=${MONGODB_URI:-mongodb://root:change-me@mongodb:27017/}
