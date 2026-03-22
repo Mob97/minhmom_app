@@ -30,8 +30,8 @@ class PriceCalc(BaseModel):
 
 
 class StockHistoryEntry(BaseModel):
-    """One stock intake batch: quantity, optional note and images."""
-    quantity: int = Field(ge=0)
+    """Stock ledger line: positive = intake, negative = deduction (e.g. order status)."""
+    quantity: float
     note: Optional[str] = None
     images: Optional[List[str]] = None
     created_at: Optional[str] = None  # ISO datetime; backend can set when missing
@@ -42,7 +42,8 @@ class Item(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
     prices: List[PricePack] = Field(default_factory=list)
-    stock_quantity: Optional[int] = Field(default=None, ge=0)  # output only: computed from stock_history
+    # Output only: sum(stock_history); may be negative if deductions exceed intake
+    stock_quantity: Optional[float] = Field(default=None)
     stock_history: Optional[List[StockHistoryEntry]] = None
     import_price: Optional[float] = Field(default=None, ge=0)
 
