@@ -261,27 +261,37 @@ export const UsersScreen: React.FC = () => {
             </TableHeader>
             <TableBody>
               {users.map((user) => (
-                <TableRow key={user.fb_uid}>
+                <TableRow key={user.id}>
                   <TableCell className="font-medium">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(`https://www.facebook.com/${user.fb_uid}`, '_blank')}
-                      className="p-0 h-auto"
-                    >
-                      <Badge variant="outline">{user.fb_uid}</Badge>
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    {user.name ? (
+                    {user.fb_uid ? (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
-                        className="p-0 h-auto text-left justify-start"
+                        onClick={() => window.open(`https://www.facebook.com/${user.fb_uid}`, '_blank')}
+                        className="p-0 h-auto"
                       >
-                        {user.name}
+                        <Badge variant="outline">{user.fb_uid}</Badge>
                       </Button>
+                    ) : (
+                      <span className="text-muted-foreground text-sm" title="Khách không gắn Facebook — dùng ID nội bộ">
+                        —
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user.name ? (
+                      user.fb_uid || user.fb_url ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
+                          className="p-0 h-auto text-left justify-start"
+                        >
+                          {user.name}
+                        </Button>
+                      ) : (
+                        <span>{user.name}</span>
+                      )
                     ) : (
                       '—'
                     )}
@@ -308,7 +318,7 @@ export const UsersScreen: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleViewUserOrders(user.fb_uid)}
+                        onClick={() => handleViewUserOrders(user.id)}
                         title="Xem đơn hàng"
                       >
                         <Eye className="h-4 w-4" />
@@ -317,7 +327,7 @@ export const UsersScreen: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setEditingUser(user.fb_uid);
+                          setEditingUser(user.id);
                           setEditUserModalOpen(true);
                         }}
                         title="Chỉnh sửa"
@@ -328,7 +338,7 @@ export const UsersScreen: React.FC = () => {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => setDeletingUser(user.fb_uid)}
+                          onClick={() => setDeletingUser(user.id)}
                           title="Xóa"
                         >
                           <Trash2 className="h-4 w-4" />

@@ -65,8 +65,8 @@ export const UserOrdersScreen: React.FC = () => {
   const total = usersResponse?.total || 0;
 
 
-  const handleViewUserOrders = (fb_uid: string) => {
-    setSelectedUserId(fb_uid);
+  const handleViewUserOrders = (userId: string) => {
+    setSelectedUserId(userId);
     setUserOrdersDrawerOpen(true);
   };
 
@@ -201,17 +201,21 @@ export const UserOrdersScreen: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                    <TableRow key={user.fb_uid}>
+                    <TableRow key={user.id}>
                       <TableCell className="font-medium">
                         {user.name ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
-                            className="p-0 h-auto text-left justify-start"
-                          >
-                            {user.name}
-                          </Button>
+                          user.fb_uid || user.fb_url ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
+                              className="p-0 h-auto text-left justify-start"
+                            >
+                              {user.name}
+                            </Button>
+                          ) : (
+                            <span>{user.name}</span>
+                          )
                         ) : (
                           '—'
                         )}
@@ -237,7 +241,7 @@ export const UserOrdersScreen: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleViewUserOrders(user.fb_uid)}
+                            onClick={() => handleViewUserOrders(user.id)}
                             title="Xem đơn hàng"
                           >
                             <Eye className="h-4 w-4" />
@@ -254,22 +258,26 @@ export const UserOrdersScreen: React.FC = () => {
           {/* Mobile Card View */}
           <div className="lg:hidden space-y-4">
             {users.map((user) => (
-              <Card key={user.fb_uid} className="p-4">
+              <Card key={user.id} className="p-4">
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-2">
                         {user.name ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
-                            className="p-0 h-auto text-left justify-start font-medium text-blue-600 hover:text-blue-800"
-                          >
-                            <span className="truncate text-sm sm:text-base">
-                              {user.name}
-                            </span>
-                          </Button>
+                          user.fb_uid || user.fb_url ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(user.fb_url || `https://www.facebook.com/${user.fb_uid}`, '_blank')}
+                              className="p-0 h-auto text-left justify-start font-medium text-blue-600 hover:text-blue-800"
+                            >
+                              <span className="truncate text-sm sm:text-base">
+                                {user.name}
+                              </span>
+                            </Button>
+                          ) : (
+                            <span className="font-medium truncate text-sm sm:text-base">{user.name}</span>
+                          )
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
                         )}
@@ -304,7 +312,7 @@ export const UserOrdersScreen: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleViewUserOrders(user.fb_uid)}
+                        onClick={() => handleViewUserOrders(user.id)}
                         title="Xem đơn hàng"
                         className="h-8 w-8 p-0"
                       >

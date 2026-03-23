@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
+from bson import ObjectId
 from ..db import get_db, customers_col, posts_col
 from ..schemas import UserIn, UserFull, PaginatedResponse, OrderUserOut, UpdateCustomerRequest
 from ..utils import str_object_id, to_local_time
@@ -107,7 +108,8 @@ async def get_user(
         raise HTTPException(404, "User not found")
     return UserFull(
         id=str_object_id(d.get("_id")),
-        fb_uid=d.get("fb_uid") or uid,
+        # Never substitute internal _id for Facebook UID — empty means no Facebook link
+        fb_uid=(d.get("fb_uid") or "").strip(),
         fb_username=d.get("fb_username"),
         name=d.get("name"),
         fb_url=d.get("fb_url"),
@@ -127,8 +129,10 @@ async def create_user(
     db=Depends(get_db)
 ):
     doc = body.model_dump()
-    # Map API fields to database fields
-    doc["_id"] = doc["fb_uid"]
+    # Primary key: Facebook UID when present; otherwise a new ObjectId (never empty string)
+    fb_uid = (doc.get("fb_uid") or "").strip()
+    doc["fb_uid"] = fb_uid
+    doc["_id"] = fb_uid if fb_uid else str(ObjectId())
     await customers_col(db).update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
     d = await customers_col(db).find_one({"_id": doc["_id"]})
     return UserFull(
@@ -564,10 +568,12 @@ async def update_customer(
     db=Depends(get_db)
 ):
     """Update customer information including addresses and phone number"""
-    # Validate that the customer exists
-    customer = await customers_col(db).find_one({"fb_uid": uid})
+    # Resolve customer by internal _id or Facebook UID (same as GET /users/{uid})
+    customer = await customers_col(db).find_one({"_id": uid}) or await customers_col(db).find_one({"fb_uid": uid})
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
+
+    cid = customer["_id"]
 
     # Prepare update data
     update_data = {}
@@ -592,7 +598,7 @@ async def update_customer(
 
     # Update the customer
     result = await customers_col(db).update_one(
-        {"fb_uid": uid},
+        {"_id": cid},
         {"$set": update_data}
     )
 
@@ -600,7 +606,7 @@ async def update_customer(
         raise HTTPException(status_code=400, detail="No changes made")
 
     # Return updated customer
-    updated_customer = await customers_col(db).find_one({"fb_uid": uid})
+    updated_customer = await customers_col(db).find_one({"_id": cid})
     if not updated_customer:
         raise HTTPException(status_code=404, detail="Customer not found after update")
 

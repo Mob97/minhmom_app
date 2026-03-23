@@ -84,6 +84,8 @@ export interface User {
 
 // User as it appears in orders (single address for shipping)
 export interface OrderUser {
+  /** Internal customer id (Mongo _id) when known — required when fb_uid is empty */
+  id?: string;
   fb_uid?: string;
   fb_username?: string;
   name?: string;

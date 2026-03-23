@@ -172,14 +172,15 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   }, []);
 
   const handleCustomerSelect = (customer: OrderUser) => {
+    const primaryAddress = customer.address || customer.addresses?.[0] || '';
     setCustomerSearch(customer.name || '');
     setIsCustomerSelected(true);
     setSelectedCustomer(customer);
-    setSelectedAddress(customer.address || '');
+    setSelectedAddress(primaryAddress);
     setFormData(prev => ({
       ...prev,
       user_name: customer.name || '',
-      user_address: customer.address || '',
+      user_address: primaryAddress,
       user_phone: customer.phone_number || '',
       url: customer.fb_url || '', // Fill URL with customer's Facebook URL
     }));
@@ -213,7 +214,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   };
 
   const handleUpdateCustomer = async () => {
-    if (!selectedCustomer?.fb_uid || !isUpdatingCustomer) return;
+    const customerUid = selectedCustomer?.id || selectedCustomer?.fb_uid;
+    if (!customerUid || !isUpdatingCustomer) return;
 
     const updateData: { name?: string; phone_number?: string; address?: string; addresses?: string[] } = {};
 
@@ -239,7 +241,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     try {
       await updateCustomerMutation.mutateAsync({
-        uid: selectedCustomer.fb_uid,
+        uid: customerUid,
         data: updateData
       });
 
@@ -274,7 +276,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         comment_created_time: undefined,
       },
       customer: {
-        fb_uid: selectedCustomer?.fb_uid,
+        fb_uid: selectedCustomer?.fb_uid || selectedCustomer?.id,
         fb_username: selectedCustomer?.fb_username,
         name: formData.user_name || undefined,
         fb_url: formData.url || undefined,
