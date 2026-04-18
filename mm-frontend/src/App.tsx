@@ -1,71 +1,52 @@
 import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { MainLayout } from '@/components/layout/MainLayout';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { AuthPage } from '@/components/auth/AuthPage';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { PostsScreen } from '@/screens/PostsScreen';
 import { OrdersScreen } from '@/screens/OrdersScreen';
 import { UserOrdersScreen } from '@/screens/UserOrdersScreen';
 import { StatusesScreen } from '@/screens/StatusesScreen';
 import { UsersScreen } from '@/screens/UsersScreen';
-import { AuthPage } from '@/components/auth/AuthPage';
-import { useAppStore } from '@/store/app-store';
-import { useAuth, AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 
-// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 1,
-    },
+    queries: { staleTime: 5 * 60 * 1000, retry: 1 },
   },
 });
 
-const AppContent: React.FC = () => {
-  const { activeTab } = useAppStore();
+const LoadingScreen: React.FC = () => (
+  <div className="min-h-svh flex items-center justify-center bg-background">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mx-auto" />
+      <p className="mt-3 text-sm text-muted-foreground">Đang tải...</p>
+    </div>
+  </div>
+);
+
+const AppRoutes: React.FC = () => {
   const { user, isLoading, isAdmin } = useAuth();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthPage />;
-  }
-
-  const renderActiveScreen = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <DashboardScreen />;
-      case 'posts':
-        return <PostsScreen />;
-      case 'orders':
-        return <OrdersScreen />;
-      case 'userOrders':
-        return <UserOrdersScreen />;
-      case 'statuses':
-        return <StatusesScreen />;
-      case 'users':
-        return <UsersScreen />;
-      default:
-        // Default to dashboard for admins, posts for regular users
-        return isAdmin ? <DashboardScreen /> : <PostsScreen />;
-    }
-  };
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <AuthPage />;
 
   return (
-    <MainLayout>
-      {renderActiveScreen()}
-    </MainLayout>
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route index element={<Navigate to={isAdmin ? '/dashboard' : '/posts'} replace />} />
+        {isAdmin && <Route path="/dashboard" element={<DashboardScreen />} />}
+        <Route path="/posts" element={<PostsScreen />} />
+        <Route path="/orders" element={<OrdersScreen />} />
+        <Route path="/user-orders" element={<UserOrdersScreen />} />
+        <Route path="/statuses" element={<StatusesScreen />} />
+        <Route path="/users" element={<UsersScreen />} />
+        <Route path="*" element={<Navigate to={isAdmin ? '/dashboard' : '/posts'} replace />} />
+      </Route>
+    </Routes>
   );
 };
 
@@ -73,8 +54,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <AppContent />
-        <Toaster />
+        <BrowserRouter>
+          <AppRoutes />
+          <Toaster />
+        </BrowserRouter>
         <ReactQueryDevtools initialIsOpen={false} />
       </AuthProvider>
     </QueryClientProvider>
