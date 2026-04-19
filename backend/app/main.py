@@ -1,11 +1,20 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .routers import statuses, users, posts, images, auth, dashboard
 from .config import config
+from .db import get_db, create_indexes
 import os
 
-app = FastAPI(title=config.api.title, version=config.api.version)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await create_indexes(get_db())
+    yield
+
+
+app = FastAPI(title=config.api.title, version=config.api.version, lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(

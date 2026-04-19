@@ -8,6 +8,7 @@ from ..auth import (
     authenticate_user,
     create_access_token,
     get_current_active_user,
+    require_admin,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from ..utils import to_local_time
@@ -17,7 +18,11 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(user: UserCreate, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def register(
+    user: UserCreate,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    _: dict = Depends(require_admin()),
+):
     """Register a new user."""
     # Check if user already exists
     existing_user = await db["users"].find_one({"username": user.username})

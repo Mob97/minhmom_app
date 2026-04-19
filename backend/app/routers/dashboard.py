@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Path
 from datetime import datetime, timezone
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..auth import require_admin
 from ..db import get_db, posts_col
 
@@ -9,13 +10,9 @@ router = APIRouter()
 @router.get("/groups/{group_id}")
 async def get_dashboard_data(
     group_id: str = Path(..., description="Group ID"),
-    current_user: dict = Depends(require_admin())
+    current_user: dict = Depends(require_admin()),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ):
-    """
-    Get dashboard data including revenue calculations and order statistics.
-    Only accessible by admin users.
-    """
-    db = get_db()
     current_year = datetime.now().year
     current_month = datetime.now().month
 
@@ -40,7 +37,7 @@ async def get_dashboard_data(
             }
         ]
     })
-    posts = await posts_cursor.to_list(length=None)
+    posts = await posts_cursor.to_list(length=10_000)
 
     # Extract all orders from posts; keep post_by_id to resolve item.import_price per order
     all_orders = []

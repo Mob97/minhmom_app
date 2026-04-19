@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAppStore } from '@/store/app-store';
 import { usePosts } from '@/hooks/use-api';
 import { t } from '@/lib/i18n';
@@ -13,13 +14,13 @@ import { Pagination } from '@/components/ui/pagination';
 import { SortableHeader, type SortConfig } from '@/components/ui/sortable-header';
 
 export const PostsScreen: React.FC = () => {
+  const location = useLocation();
   const {
     selectedGroupId,
     postsSearchQuery,
     setPostsSearchQuery,
     setSelectedPostId,
     setOrdersDrawerOpen,
-    activeTab
   } = useAppStore();
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,12 +58,12 @@ export const PostsScreen: React.FC = () => {
     sort_direction: sortConfig.direction || 'desc',
   });
 
-  // Refetch posts when the user navigates back to the posts screen
+  // Refetch posts when navigating to this screen
   useEffect(() => {
-    if (activeTab === 'posts' && selectedGroupId) {
+    if (selectedGroupId) {
       refetch();
     }
-  }, [activeTab, selectedGroupId, refetch]);
+  }, [location.pathname, selectedGroupId, refetch]);
 
   const posts = postsResponse?.data || [];
   const totalPages = postsResponse?.total_pages || 1;

@@ -9,4 +9,13 @@ export default defineConfig({
       "@": "/src",
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://minhmom.ddns.net',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })
