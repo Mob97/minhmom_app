@@ -1032,30 +1032,19 @@ async def update_order(
     if maybe_updated_items is not None:
         set_data["items"] = maybe_updated_items
 
+    atomic_update: dict = {"$set": set_data}
+    if status_history_entry is not None:
+        atomic_update["$push"] = {"orders.$[o].status_history": status_history_entry}
+
     res = await posts_col(db, group_id).update_one(
         {"_id": post_id, "orders.order_id": order_id},
-        {
-            "$set": set_data,
-            "$setOnInsert": {},
-        },
+        atomic_update,
         array_filters=[{"o.order_id": order_id}],
         upsert=False,
     )
 
     if res.matched_count == 0:
         raise HTTPException(404, "Không tìm thấy đơn hàng")
-
-    # If status was updated, add status history entry separately
-    if status_history_entry is not None:
-        await posts_col(db, group_id).update_one(
-            {"_id": post_id, "orders.order_id": order_id},
-            {
-                "$push": {
-                    "orders.$[o].status_history": status_history_entry
-                }
-            },
-            array_filters=[{"o.order_id": order_id}]
-        )
 
     # Return the updated order
     d = await posts_col(db, group_id).find_one({"_id": post_id}, {"orders": 1})

@@ -1,6 +1,7 @@
 # Production Backend Configuration
 database:
-  mongodb_uri: mongodb://root:change-me@192.168.1.14:27017/
+  # Credentials must be supplied via MONGODB_URI environment variable
+  mongodb_uri: mongodb://localhost:27017
   db_name: "minhmom_dev"
   default_group_id: null
 
@@ -18,7 +19,7 @@ api:
   title: "MinhMom Backend"
   version: "0.1.0"
   cors_origins:
-    - "*"
+    - "https://minhmom.ddns.net"
 
 # Logging configuration
 logging:

@@ -141,6 +141,18 @@ class UserIn(BaseModel):
     is_active: bool = True
 
 
+class UserPatch(BaseModel):
+    fb_uid: Optional[str] = None
+    fb_username: Optional[str] = None
+    name: Optional[str] = None
+    fb_url: Optional[str] = None
+    addresses: Optional[List[str]] = None
+    phone_number: Optional[str] = None
+    avatar_url: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 class UserFull(UserIn):
     id: str
     created_date: Optional[str] = None

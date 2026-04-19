@@ -8,8 +8,14 @@ from .db import get_db
 from .schemas import TokenData, UserRole
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-# Security configuration
-SECRET_KEY = "your-secret-key-change-this-in-production"  # TODO: Move to environment variable
+# Security configuration — JWT_SECRET_KEY must be set in the environment
+import os as _os
+SECRET_KEY: str = _os.environ.get("JWT_SECRET_KEY", "")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY environment variable is not set. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

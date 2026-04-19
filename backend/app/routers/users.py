@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from bson import ObjectId
 from ..db import get_db, customers_col, posts_col
-from ..schemas import UserIn, UserFull, PaginatedResponse, OrderUserOut, UpdateCustomerRequest
+from ..schemas import UserIn, UserPatch, UserFull, PaginatedResponse, OrderUserOut, UpdateCustomerRequest
 from ..utils import str_object_id, to_local_time
 from ..auth import require_user_or_admin, require_admin
 import math
@@ -153,12 +153,13 @@ async def create_user(
 @router.patch("/{uid}", response_model=UserFull)
 async def update_user(
     uid: str,
-    body: UserIn,
+    body: UserPatch,
     current_user: dict = Depends(require_user_or_admin()),
     db=Depends(get_db)
 ):
-    doc = body.model_dump()
-    # Map API fields to database fields
+    doc = body.model_dump(exclude_none=True)
+    if not doc:
+        raise HTTPException(400, "No fields to update")
     await customers_col(db).update_one({"_id": uid}, {"$set": doc})
     d = await customers_col(db).find_one({"_id": uid})
     if not d:
@@ -306,51 +307,30 @@ async def list_users_with_orders(
         }
     })
 
-    # Handle sorting - if sorting by comment_created_time, we need special handling
-    if sort_by == "comment_created_time":
-        sort_direction_val = -1 if sort_direction == "desc" else 1
-        pipeline.append({"$sort": {"latest_comment_time": sort_direction_val}})
+    # Map sort field → aggregation field name
+    sort_field_map = {
+        "comment_created_time": "latest_comment_time",
+        "order_count": "order_count",
+        "total_revenue": "total_revenue",
+        "name": "user_doc.name",
+        "fb_uid": "_id",
+    }
+    agg_sort_field = sort_field_map.get(sort_by or "", "order_count")
+    sort_direction_val = -1 if sort_direction == "desc" else 1
 
-        # Apply pagination at database level for comment_created_time sorting
-        skip = (page - 1) * page_size
-        pipeline.extend([
-            {"$skip": skip},
-            {"$limit": page_size}
-        ])
+    pipeline.append({"$sort": {agg_sort_field: sort_direction_val}})
 
-        # Execute aggregation with pagination
-        cursor = posts_col(db, group_id).aggregate(pipeline)
-        users_data = await cursor.to_list(length=None)
+    skip = (page - 1) * page_size
 
-        # Get total count for pagination (without pagination)
-        count_pipeline = pipeline[:-2]  # Remove skip and limit
-        count_pipeline.append({"$count": "total"})
-        count_cursor = posts_col(db, group_id).aggregate(count_pipeline)
-        count_result = await count_cursor.to_list(length=1)
-        total = count_result[0]["total"] if count_result else 0
+    # Count before pagination
+    count_pipeline = pipeline + [{"$count": "total"}]
+    count_cursor = posts_col(db, group_id).aggregate(count_pipeline)
+    count_result = await count_cursor.to_list(length=1)
+    total = count_result[0]["total"] if count_result else 0
 
-    else:
-        # For other sorting options, we need to process all data first
-        cursor = posts_col(db, group_id).aggregate(pipeline)
-        users_data = await cursor.to_list(length=None)
-
-        # Apply sorting in Python for non-comment_created_time fields
-        if sort_by == "order_count":
-            users_data.sort(key=lambda x: x["order_count"], reverse=(sort_direction == "desc"))
-        elif sort_by == "total_revenue":
-            users_data.sort(key=lambda x: x["total_revenue"], reverse=(sort_direction == "desc"))
-        elif sort_by == "name":
-            users_data.sort(key=lambda x: (x["user_doc"].get("name") or "").lower(), reverse=(sort_direction == "desc"))
-        elif sort_by == "fb_uid":
-            users_data.sort(key=lambda x: (x["user_doc"].get("fb_uid") or "").lower(), reverse=(sort_direction == "desc"))
-        else:
-            # Default sort by order count descending
-            users_data.sort(key=lambda x: x["order_count"], reverse=True)
-
-        # Apply pagination
-        total = len(users_data)
-        skip = (page - 1) * page_size
-        users_data = users_data[skip:skip + page_size]
+    pipeline.extend([{"$skip": skip}, {"$limit": page_size}])
+    cursor = posts_col(db, group_id).aggregate(pipeline)
+    users_data = await cursor.to_list(length=page_size)
 
     # Calculate total pages
     total_pages = math.ceil(total / page_size) if total > 0 else 1
