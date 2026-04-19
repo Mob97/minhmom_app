@@ -135,7 +135,7 @@ class Settings(BaseSettings):
     DB_NAME: str = config.database.db_name
     DEFAULT_GROUP_ID: str | None = config.database.default_group_id
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
